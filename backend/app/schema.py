@@ -29,6 +29,10 @@ class DriverState(BaseModel):
     tire: Tire
     x: float | None = None
     y: float | None = None
+    lap_number: int | None = None
+    sector_1_time: float | None = None
+    sector_2_time: float | None = None
+    sector_3_time: float | None = None
 
 
 class SessionState(BaseModel):
