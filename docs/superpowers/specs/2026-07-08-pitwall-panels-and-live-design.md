@@ -19,18 +19,24 @@ GPS-derived telemetry of that race, it is automatically correct for whichever ci
 running — there is nothing to look up and nothing that can point at the wrong track.
 
 **Replay mode implementation:**
-- The backend computes a **track layout** once per loaded session: take the driver with the
-  most complete telemetry for that session, pull their fastest lap's car position trace
-  (`lap.get_telemetry()` → X/Z columns from FastF1, which are lateral/longitudinal meters on
-  track), downsample to ~150 points, and serve it via a new `GET /session/track-layout`
-  endpoint (cached in memory after `/session/replay` loads a session).
-- `DriverState.x` / `DriverState.y` (already present, nullable, in the schema) are populated
-  in replay mode by finding the telemetry sample nearest each driver's lap-end timestamp.
-  This gives one position update per lap (matching the existing lap-granularity replay), not
-  smooth sub-lap movement — a documented v1 simplification (`ponytail:` comment), upgradeable
-  by sampling telemetry at sub-lap ticks later without changing the schema or frontend.
+- The backend computes a **track layout** once per loaded session: take the session's fastest
+  lap's car position trace (`lap.get_telemetry()` → X/Y columns from FastF1, meters on the
+  track plane), downsample to ~150 points, and serve it via a new `GET /session/track-layout`
+  endpoint (backed by an in-memory session cache keyed by year/event/session_type, populated
+  when `/session/replay` first loads that session).
+- `DriverState.x` / `DriverState.y` (already present, nullable, in the schema) stay `None` in
+  replay mode for this plan — computing a live per-driver dot position at each lap-granularity
+  tick would require passing FastF1's stateful `Lap`/`Session` objects into what is otherwise a
+  pure, unit-testable conversion function, which isn't worth the coupling for a v1 slice.
+  The Track Map panel renders the correct-shaped outline (satisfying "right map for the right
+  circuit") without animated car dots in replay mode; a `ponytail:` comment in the adapter
+  notes sub-lap telemetry sampling as the upgrade path if per-driver replay dots are wanted
+  later. Live mode (below) populates `x`/`y` continuously from day one, since f1-dash's feed
+  already carries live position telemetry per update — no equivalent coupling problem there.
 - The frontend fetches the layout once when a replay starts, computes a bounding box, and
-  renders an SVG path auto-scaled to fit; driver dots plot from `x`/`y` on each tick.
+  renders an SVG path auto-scaled to fit. It plots driver dots from `x`/`y` whenever they're
+  present (i.e. always in live mode, never in replay mode for this plan) and shows the bare
+  outline otherwise.
 
 **Live mode:** f1-dash's `Position.z` live-timing topic already carries each car's live X/Y
 telemetry sampled continuously — the live adapter (below) maps it directly into
