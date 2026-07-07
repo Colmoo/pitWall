@@ -48,7 +48,11 @@ async def session_socket(websocket: WebSocket):
         while True:
             state = await queue.get()
             await websocket.send_json(state.model_dump(mode="json"))
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError):
+        # Starlette's WebSocket.send() only converts OSError to WebSocketDisconnect;
+        # other close-related failures (e.g. sending after the connection already
+        # transitioned to DISCONNECTED) surface as a plain RuntimeError, so catch
+        # both to avoid an unhandled exception on client disconnect.
         pass
     finally:
         broadcaster.unsubscribe(queue)
