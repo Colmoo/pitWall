@@ -1,0 +1,72 @@
+<h2>Which visual direction feels like a real pitwall?</h2>
+<p class="subtitle">Same Timing Tower data, three different treatments. Click the one that feels right — we'll refine from there.</p>
+
+<div class="cards">
+  <div class="card" data-choice="broadcast" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0a0a0f;padding:16px;border-radius:4px;font-family:'Arial Narrow',Arial,sans-serif;">
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="background:#e10600;color:#fff;padding:4px 10px;font-weight:700;font-size:11px;letter-spacing:1px;">TIMING TOWER</div>
+          <div style="background:#1a1a22;color:#888;padding:4px 10px;font-size:11px;">TRACK MAP</div>
+          <div style="background:#1a1a22;color:#888;padding:4px 10px;font-size:11px;">TYRES</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;color:#fff;">
+          <tr style="color:#888;font-size:10px;letter-spacing:1px;"><td>POS</td><td>DRIVER</td><td>GAP</td><td>LAST</td><td>TYRE</td></tr>
+          <tr style="border-top:2px solid #e10600;"><td style="padding:5px 0;font-weight:700;">1</td><td style="font-weight:700;">VER</td><td>-</td><td>1:32.456</td><td><span style="background:#e10600;color:#fff;padding:1px 5px;border-radius:2px;font-size:10px;">S</span> 3</td></tr>
+          <tr style="border-top:1px solid #2a2a33;"><td style="padding:5px 0;">2</td><td>HAM</td><td style="color:#4ade80;">+1.204</td><td>1:32.901</td><td><span style="background:#f5c518;color:#000;padding:1px 5px;border-radius:2px;font-size:10px;">M</span> 5</td></tr>
+          <tr style="border-top:1px solid #2a2a33;"><td style="padding:5px 0;">3</td><td>LEC</td><td style="color:#f87171;">+2.981</td><td>1:33.102</td><td><span style="background:#f5c518;color:#000;padding:1px 5px;border-radius:2px;font-size:10px;">M</span> 5</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Broadcast Graphics</h3>
+      <p>Bold condensed type, team-red accents, rounded compound chips — like the F1 TV on-screen timing overlay.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="terminal" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#000;padding:16px;border-radius:4px;font-family:'Courier New',monospace;border:1px solid #1a3a1a;">
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="background:#0f2a0f;color:#0f0;padding:4px 10px;font-size:11px;border:1px solid #0f0;">[1] TIMING</div>
+          <div style="color:#0a5a0a;padding:4px 10px;font-size:11px;">[2] TRACK</div>
+          <div style="color:#0a5a0a;padding:4px 10px;font-size:11px;">[3] TYRES</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;color:#0f0;">
+          <tr style="color:#0a5a0a;"><td>POS</td><td>DRV</td><td>GAP</td><td>LAST</td><td>TYRE</td></tr>
+          <tr><td style="padding:4px 0;">01</td><td>VER</td><td>---.---</td><td>1:32.456</td><td>S03</td></tr>
+          <tr><td style="padding:4px 0;">02</td><td>HAM</td><td>+01.204</td><td>1:32.901</td><td>M05</td></tr>
+          <tr><td style="padding:4px 0;">03</td><td>LEC</td><td>+02.981</td><td>1:33.102</td><td>M05</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Engineering Terminal</h3>
+      <p>Monospace green-on-black, numbered hotkey tabs — like a legacy telemetry/timing terminal.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="dashboard" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#13151a;padding:16px;border-radius:8px;font-family:-apple-system,Inter,sans-serif;border:1px solid #2a2d36;">
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
+          <div style="background:#2563eb;color:#fff;padding:5px 12px;border-radius:6px;font-size:11px;">Timing Tower</div>
+          <div style="background:#1c1e26;color:#8b8fa3;padding:5px 12px;border-radius:6px;font-size:11px;">Track Map</div>
+          <div style="background:#1c1e26;color:#8b8fa3;padding:5px 12px;border-radius:6px;font-size:11px;">Tyres</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;color:#e5e7eb;">
+          <tr style="color:#6b7280;font-size:10px;"><td>POS</td><td>DRIVER</td><td>GAP</td><td>LAST LAP</td><td>TYRE</td></tr>
+          <tr style="background:#1a1c24;"><td style="padding:6px 4px;border-radius:4px 0 0 4px;">1</td><td>VER</td><td>—</td><td>1:32.456</td><td style="border-radius:0 4px 4px 0;"><span style="background:#dc2626;padding:2px 6px;border-radius:10px;font-size:10px;">SOFT · 3</span></td></tr>
+          <tr><td style="padding:6px 4px;">2</td><td>HAM</td><td style="color:#4ade80;">+1.204</td><td>1:32.901</td><td><span style="background:#ca8a04;padding:2px 6px;border-radius:10px;font-size:10px;">MED · 5</span></td></tr>
+          <tr><td style="padding:6px 4px;">3</td><td>LEC</td><td style="color:#f87171;">+2.981</td><td>1:33.102</td><td><span style="background:#ca8a04;padding:2px 6px;border-radius:10px;font-size:10px;">MED · 5</span></td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Modern Dashboard</h3>
+      <p>Rounded cards, soft dark slate, pill badges — like a polished SaaS analytics dashboard.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">You can also mix elements (e.g. "B's monospace numbers but A's team colors") — just describe it in the terminal.</p>

@@ -1,0 +1,73 @@
+<h2>Apple Sports-style pitwall</h2>
+<p class="subtitle">Frosted glass cards, big SF Pro-style numerals, team-color gradients, minimal chrome, dark by default.</p>
+
+<div class="mockup">
+  <div class="mockup-header">Preview: Timing Tower, Apple Sports style</div>
+  <div class="mockup-body">
+    <div style="background:radial-gradient(circle at 20% 0%, #1a1035 0%, #0a0a0f 55%);padding:24px;border-radius:20px;font-family:-apple-system,'SF Pro Display',Inter,sans-serif;">
+
+      <!-- segmented tab control -->
+      <div style="display:inline-flex;background:rgba(255,255,255,0.08);backdrop-filter:blur(20px);border-radius:14px;padding:4px;margin-bottom:20px;">
+        <div style="background:rgba(255,255,255,0.16);color:#fff;padding:7px 16px;border-radius:10px;font-size:13px;font-weight:600;">Timing</div>
+        <div style="color:rgba(255,255,255,0.5);padding:7px 16px;border-radius:10px;font-size:13px;font-weight:600;">Track</div>
+        <div style="color:rgba(255,255,255,0.5);padding:7px 16px;border-radius:10px;font-size:13px;font-weight:600;">Tyres</div>
+        <div style="color:rgba(255,255,255,0.5);padding:7px 16px;border-radius:10px;font-size:13px;font-weight:600;">Sectors</div>
+      </div>
+
+      <!-- leader card, glassy, gradient hairline -->
+      <div style="background:rgba(255,255,255,0.06);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.1);border-radius:18px;padding:16px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;box-shadow:0 8px 30px rgba(0,0,0,0.3);">
+        <div style="font-size:28px;font-weight:800;color:#fff;width:34px;">1</div>
+        <div style="width:4px;height:36px;border-radius:2px;background:linear-gradient(180deg,#3671C6,#1E3A6D);"></div>
+        <div style="flex:1;">
+          <div style="font-size:16px;font-weight:700;color:#fff;letter-spacing:0.3px;">Max Verstappen</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);">Red Bull Racing</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:15px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums;">1:32.456</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.45);">last lap</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#e10600,#8a0000);padding:5px 10px;border-radius:10px;font-size:11px;font-weight:700;color:#fff;min-width:34px;text-align:center;">S · 3</div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.05);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;">
+        <div style="font-size:24px;font-weight:800;color:rgba(255,255,255,0.85);width:34px;">2</div>
+        <div style="width:4px;height:32px;border-radius:2px;background:linear-gradient(180deg,#27F4D2,#0e8f7a);"></div>
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:600;color:#fff;">Lewis Hamilton</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);">Mercedes</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:600;color:#4ade80;font-variant-numeric:tabular-nums;">+1.204</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.45);">gap</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#f5c518,#b88a00);padding:5px 10px;border-radius:10px;font-size:11px;font-weight:700;color:#000;min-width:34px;text-align:center;">M · 5</div>
+      </div>
+
+      <div style="background:rgba(255,255,255,0.05);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:14px 18px;display:flex;align-items:center;gap:14px;">
+        <div style="font-size:24px;font-weight:800;color:rgba(255,255,255,0.85);width:34px;">3</div>
+        <div style="width:4px;height:32px;border-radius:2px;background:linear-gradient(180deg,#E8002D,#7a0018);"></div>
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:600;color:#fff;">Charles Leclerc</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);">Ferrari</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:600;color:#f87171;font-variant-numeric:tabular-nums;">+2.981</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.45);">gap</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#f5c518,#b88a00);padding:5px 10px;border-radius:10px;font-size:11px;font-weight:700;color:#000;min-width:34px;text-align:center;">M · 5</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:20px;">
+  <div class="option" data-choice="yes-this" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content"><h3>This is it</h3><p>Glass cards, gradients, big rounded numerals — go with this direction</p></div>
+  </div>
+  <div class="option" data-choice="adjust" onclick="toggleSelect(this)">
+    <div class="letter">~</div>
+    <div class="content"><h3>Close, but tweak</h3><p>Tell me what to change in the terminal</p></div>
+  </div>
+</div>
