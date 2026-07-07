@@ -1,0 +1,22 @@
+# docker-compose.yml
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - FASTF1_CACHE_DIR=/data/fastf1_cache
+    volumes:
+      - fastf1_cache:/data/fastf1_cache
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_BACKEND_WS_URL=ws://localhost:8000/ws/session
+    depends_on:
+      - backend
+
+volumes:
+  fastf1_cache:
