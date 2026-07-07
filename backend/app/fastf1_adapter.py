@@ -6,6 +6,10 @@ import pandas as pd
 from app.schema import DriverState, SessionState, Tire, TrackStatus
 
 
+def _sector_seconds(value) -> float | None:
+    return None if pd.isna(value) else value.total_seconds()
+
+
 def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> list[SessionState]:
     states: list[SessionState] = []
     best_lap_by_driver: dict[str, float] = {}
@@ -44,6 +48,10 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
                     last_lap_time=last_lap_seconds,
                     best_lap_time=best_so_far,
                     tire=Tire(compound=row["Compound"], age_laps=age_laps),
+                    lap_number=int(lap_number),
+                    sector_1_time=_sector_seconds(row.get("Sector1Time")),
+                    sector_2_time=_sector_seconds(row.get("Sector2Time")),
+                    sector_3_time=_sector_seconds(row.get("Sector3Time")),
                 )
             )
 

@@ -88,3 +88,40 @@ def test_session_states_from_laps_best_lap_time_stays_pinned_to_faster_earlier_l
     ver_lap2 = next(d for d in states[1].drivers if d.abbreviation == "VER")
     assert ver_lap2.last_lap_time == 95.0
     assert ver_lap2.best_lap_time == 92.0  # stays pinned to lap 1, the faster lap
+
+
+def _laps_df_with_sectors():
+    laps, session_start = _laps_df()
+    laps["Sector1Time"] = [
+        timedelta(seconds=28.0), timedelta(seconds=27.5),
+        timedelta(seconds=28.5), pd.NaT,
+    ]
+    laps["Sector2Time"] = [
+        timedelta(seconds=32.0), timedelta(seconds=31.5),
+        timedelta(seconds=32.5), timedelta(seconds=32.0),
+    ]
+    laps["Sector3Time"] = [
+        timedelta(seconds=32.0), timedelta(seconds=31.0),
+        timedelta(seconds=32.0), timedelta(seconds=31.5),
+    ]
+    return laps, session_start
+
+
+def test_session_states_from_laps_includes_lap_number_and_sector_times():
+    laps, session_start = _laps_df_with_sectors()
+    states = session_states_from_laps(laps, session_start)
+    ver_lap1 = next(d for d in states[0].drivers if d.abbreviation == "VER")
+    assert ver_lap1.lap_number == 1
+    assert ver_lap1.sector_1_time == 28.0
+    assert ver_lap1.sector_2_time == 32.0
+    assert ver_lap1.sector_3_time == 32.0
+
+
+def test_session_states_from_laps_handles_missing_sector_time():
+    laps, session_start = _laps_df_with_sectors()
+    states = session_states_from_laps(laps, session_start)
+    # HAM's lap 2 (index 3 in the fixture rows) has NaT Sector1Time
+    ham_lap2 = next(d for d in states[1].drivers if d.abbreviation == "HAM")
+    assert ham_lap2.sector_1_time is None
+    assert ham_lap2.sector_2_time == 32.0
+    assert ham_lap2.sector_3_time == 31.5
