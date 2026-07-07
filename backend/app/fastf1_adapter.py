@@ -16,12 +16,20 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
 
         drivers: list[DriverState] = []
         for _, row in group.iterrows():
+            # Real FastF1 data has NaN/NaT for out-laps, in-laps, red-flag laps,
+            # and unclassified/retired drivers. Skip rows we can't build a usable
+            # snapshot entry from, rather than crashing or fabricating values.
+            if pd.isna(row["LapTime"]) or pd.isna(row["Position"]):
+                continue
+
             last_lap_seconds = row["LapTime"].total_seconds()
             number = str(row["DriverNumber"])
             best_so_far = best_lap_by_driver.get(number)
             if best_so_far is None or last_lap_seconds < best_so_far:
                 best_so_far = last_lap_seconds
             best_lap_by_driver[number] = best_so_far
+
+            age_laps = 0 if pd.isna(row["TyreLife"]) else int(row["TyreLife"])
 
             drivers.append(
                 DriverState(
@@ -35,9 +43,12 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
                     gap_to_ahead=None,
                     last_lap_time=last_lap_seconds,
                     best_lap_time=best_so_far,
-                    tire=Tire(compound=row["Compound"], age_laps=int(row["TyreLife"])),
+                    tire=Tire(compound=row["Compound"], age_laps=age_laps),
                 )
             )
+
+        if not drivers:
+            continue
 
         states.append(
             SessionState(
