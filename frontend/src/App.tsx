@@ -20,6 +20,10 @@ export default function App() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      const target = document.activeElement;
+      if (target instanceof HTMLElement && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) {
+        return;
+      }
       const index = Number(e.key) - 1;
       if (index >= 0 && index < TABS.length) {
         setActiveTab(TABS[index]);

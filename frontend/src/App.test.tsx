@@ -27,3 +27,16 @@ test("switches to Track Map tab via number key 2", () => {
   fireEvent.keyDown(window, { key: "2" });
   expect(screen.getByText(/start a session/i)).toBeInTheDocument();
 });
+
+test("number key presses while a form input is focused do not switch tabs", () => {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: /track map/i }));
+  expect(screen.getByText(/start a session/i)).toBeInTheDocument();
+
+  const yearInput = screen.getByLabelText(/year/i);
+  yearInput.focus();
+  fireEvent.keyDown(yearInput, { key: "1" });
+
+  // still on Track Map, not hijacked back to Timing Tower
+  expect(screen.getByText(/start a session/i)).toBeInTheDocument();
+});
