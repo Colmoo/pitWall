@@ -38,10 +38,14 @@ running — there is nothing to look up and nothing that can point at the wrong 
   present (i.e. always in live mode, never in replay mode for this plan) and shows the bare
   outline otherwise.
 
-**Live mode:** f1-dash's `Position.z` live-timing topic already carries each car's live X/Y
-telemetry sampled continuously — the live adapter (below) maps it directly into
-`DriverState.x`/`y` per update, and the frontend's track map component needs no changes to
-support it (same fields, just updating faster and more often).
+**Live mode:** F1's live-timing feed carries a `Position.z` topic with continuous car X/Y, but
+it (like `CarData.z`) is gzip-compressed and base64-encoded in the raw feed — decompressing and
+parsing it correctly is real, unverified-until-tested work (see below). Live mode v1 ships
+**without** animated car dots for the same reason replay mode does — `DriverState.x`/`y` stay
+`None` in both modes for this plan. This removes an asymmetry that would otherwise exist (live
+having dots, replay not) and defers the compressed-topic work to a fast-follow once it can be
+verified against a real live session. The Track Map panel and its frontend code need no changes
+either way — it already renders "outline only" gracefully when `x`/`y` are null.
 
 ## New panels (frontend, all consume the existing WebSocket stream)
 - **Track Map** — SVG track outline (see above) + colored dot per driver at their `x`/`y`,
@@ -73,19 +77,47 @@ Sector Times. Session/mode controls (existing replay-start form) stay visible ab
 regardless of which panel is active.
 
 ## Live mode (f1-dash integration)
-- The backend adds a **live adapter** that connects as a WebSocket client to a running f1-dash
-  server instance and translates its messages into `SessionState` broadcasts, reusing the
-  existing `Broadcaster` — the frontend and every panel are unaware of which mode is feeding
-  them, per the original design's "session controller" principle.
+
+**Correction from the original design (researched, not assumed):** f1-dash does not expose a
+WebSocket. Its actual server (`realtime/src/http_server.rs` in the f1-dash repo) exposes
+**Server-Sent Events** at `GET /api/realtime` — two event types, `"initial"` (a full JSON state
+snapshot) and `"update"` (a JSON merge-patch fragment to apply on top of the running state).
+f1-dash's own typed Rust schema (`shared/src/models.rs`/`events.rs`) is dead code — commented
+out of the build — so it does **not** define the real wire format. What's actually live
+(`realtime/src/services/state_service.rs`) stores state as an untyped `serde_json::Value` built
+by recursively deep-merging whatever arrives; the real topic names come straight from F1's own
+official live-timing SignalR feed, which f1-dash subscribes to directly
+(`realtime/src/f1.rs`) and forwards close to verbatim: `Heartbeat`, `CarData.z`, `Position.z`,
+`ExtrapolatedClock`, `TimingStats`, `TimingAppData`, `WeatherData`, `TrackStatus`,
+`SessionStatus`, `DriverList`, `RaceControlMessages`, `SessionInfo`, `SessionData`, `LapCount`,
+`TimingData`, `TeamRadio`, `ChampionshipPrediction`.
+
+- The backend adds a **live adapter** that connects as an SSE client (not a WebSocket client) to
+  a running f1-dash server's `GET /api/realtime`, applies `"update"` merge-patches on top of the
+  `"initial"` snapshot using the same recursive merge-patch algorithm f1-dash itself uses
+  (deep-merge objects, index-merge arrays), and translates the resulting merged JSON tree into
+  `SessionState` broadcasts on every meaningful change, reusing the existing `Broadcaster` — the
+  frontend and every panel stay unaware of which mode is feeding them.
+- v1 reads only the `DriverList`, `TimingData`, and `TrackStatus` topics from the merged tree —
+  the ones needed for the Timing Tower and track-status data, using field names from F1's
+  well-documented live-timing schema (the same schema FastF1's own bundled live-timing client
+  parses — see `fastf1.livetiming`). These field names are **best-effort, not verified against a
+  real live feed** (there is no live F1 session to test against outside a race weekend); the
+  plan's tests use representative sample payloads shaped like the documented schema, and a
+  manual verification pass against a real live session is called out as a follow-up acceptance
+  step, not something this plan can automate.
+- `CarData.z` and `Position.z` are gzip-compressed, base64-encoded in F1's raw feed — decoding
+  them correctly is real, separately-verifiable work. v1 does not attempt it (see the Track Map
+  section above: replay mode already ships without animated dots, so live mode matching that for
+  now is not a regression); a `ponytail:` comment marks decompressing these topics as the
+  upgrade path for live car-position dots.
 - f1-dash is added to `docker-compose.yml` as its own service (its published image), so
   `docker compose up` brings up all three services; live mode only does anything useful during
   a real F1 session weekend, which is expected and fine for a dev slice.
 - A new `POST /session/live` endpoint starts the live adapter (mirroring `/session/replay`'s
   shape); starting one mode while the other is active stops the previous one first (only one
-  active session/broadcast source at a time — this matches the original spec's "session
-  controller owns switching between live and replay").
-- Exact f1-dash message topic names/shapes are confirmed against f1-dash's own source/docs at
-  implementation time (recorded in the plan once confirmed) rather than assumed here.
+  active session/broadcast source at a time — matches the original spec's "session controller
+  owns switching between live and replay").
 
 ## Out of scope for these two plans (unchanged from original spec)
 AI/Ollama analysis layer (separate future plan). Pixel-perfect visual polish (separate future
