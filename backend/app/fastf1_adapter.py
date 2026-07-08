@@ -49,9 +49,9 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
                     best_lap_time=best_so_far,
                     tire=Tire(compound=row["Compound"], age_laps=age_laps),
                     lap_number=int(lap_number),
-                    sector_1_time=_sector_seconds(row.get("Sector1Time")),
-                    sector_2_time=_sector_seconds(row.get("Sector2Time")),
-                    sector_3_time=_sector_seconds(row.get("Sector3Time")),
+                    sector_1_time=_sector_seconds(row["Sector1Time"]),
+                    sector_2_time=_sector_seconds(row["Sector2Time"]),
+                    sector_3_time=_sector_seconds(row["Sector3Time"]),
                 )
             )
 
