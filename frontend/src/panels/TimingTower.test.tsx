@@ -11,11 +11,13 @@ const sampleState: SessionState = {
       driver_number: "1", abbreviation: "VER", team: "Red Bull", position: 1,
       gap_to_leader: null, gap_to_ahead: null, last_lap_time: 90.5, best_lap_time: 90.1,
       tire: { compound: "SOFT", age_laps: 3 }, x: null, y: null,
+      lap_number: null, sector_1_time: null, sector_2_time: null, sector_3_time: null,
     },
     {
       driver_number: "44", abbreviation: "HAM", team: "Mercedes", position: 2,
       gap_to_leader: null, gap_to_ahead: null, last_lap_time: 91.2, best_lap_time: 90.8,
       tire: { compound: "MEDIUM", age_laps: 5 }, x: null, y: null,
+      lap_number: null, sector_1_time: null, sector_2_time: null, sector_3_time: null,
     },
   ],
 };
