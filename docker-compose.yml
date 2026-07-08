@@ -9,6 +9,14 @@ services:
     volumes:
       - fastf1_cache:/data/fastf1_cache
 
+  f1-dash-realtime:
+    image: ghcr.io/slowlydev/f1-dash-realtime:dev
+    environment:
+      - ADDRESS=0.0.0.0:80
+      - RUST_LOG=info
+    ports:
+      - "4000:80"
+
   frontend:
     build:
       context: ./frontend
