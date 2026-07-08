@@ -10,7 +10,8 @@ services:
       - fastf1_cache:/data/fastf1_cache
 
   f1-dash-realtime:
-    image: ghcr.io/slowlydev/f1-dash-realtime:dev
+    image: ghcr.io/slowlydev/f1-dash-realtime:latest
+    platform: linux/amd64
     environment:
       - ADDRESS=0.0.0.0:80
       - RUST_LOG=info
