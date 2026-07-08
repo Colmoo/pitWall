@@ -36,3 +36,17 @@ test("does not call onStarted when the request fails", async () => {
   await waitFor(() => expect(global.fetch).toHaveBeenCalled());
   expect(onStarted).not.toHaveBeenCalled();
 });
+
+test("start live button POSTs to /session/live", async () => {
+  const onStarted = vi.fn();
+  global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 202 });
+
+  render(<ReplayControls onStarted={onStarted} />);
+  fireEvent.click(screen.getByRole("button", { name: /start live/i }));
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    expect.stringContaining("/session/live"),
+    expect.objectContaining({ method: "POST" }),
+  ));
+  expect(onStarted).not.toHaveBeenCalled();
+});
