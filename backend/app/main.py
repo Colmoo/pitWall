@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -12,8 +13,17 @@ from app.replay import ReplayEngine
 app = FastAPI(title="PitWall")
 broadcaster = Broadcaster()
 CACHE_DIR = os.environ.get("FASTF1_CACHE_DIR", "/tmp/fastf1_cache")
+logger = logging.getLogger(__name__)
 
 _current_task: asyncio.Task | None = None
+
+
+def _log_task_exception(task: asyncio.Task) -> None:
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("Session task failed: %s", exc, exc_info=exc)
 
 
 def _start_session_task(coro) -> None:
@@ -21,6 +31,7 @@ def _start_session_task(coro) -> None:
     if _current_task is not None and not _current_task.done():
         _current_task.cancel()
     _current_task = asyncio.create_task(coro)
+    _current_task.add_done_callback(_log_task_exception)
 
 
 @app.get("/health")

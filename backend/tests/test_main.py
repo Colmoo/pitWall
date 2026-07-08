@@ -104,3 +104,31 @@ def test_starting_a_new_session_cancels_the_previous_one(monkeypatch):
         # thread) needs a tick to actually process it and flip to done/cancelled.
         time.sleep(0.05)
         assert first_task.cancelled() or first_task.done()
+
+
+def test_session_task_exception_is_logged_not_swallowed(monkeypatch, caplog):
+    import time
+
+    class BoomLiveAdapter:
+        def __init__(self, sse_url):
+            pass
+
+        async def stream(self):
+            raise ValueError("boom")
+            yield  # pragma: no cover
+
+    monkeypatch.setattr("app.main.LiveAdapter", BoomLiveAdapter)
+
+    with caplog.at_level("ERROR", logger="app.main"):
+        resp = client.post("/session/live", json={})
+        assert resp.status_code == 202
+        task = app_module._current_task
+
+        # ponytail: same portal-thread tick issue as the cancellation test above.
+        time.sleep(0.05)
+
+    assert task.done()
+    # The done-callback already called task.exception(), so it is no longer
+    # "unretrieved" - calling it again here just confirms what was raised.
+    assert isinstance(task.exception(), ValueError)
+    assert "Session task failed" in caplog.text
