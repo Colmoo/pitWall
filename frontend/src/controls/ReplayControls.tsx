@@ -30,6 +30,14 @@ export function ReplayControls({
     }
   }
 
+  async function handleStartLive() {
+    await fetch(`${API_URL}/session/live`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+  }
+
   return (
     <form onSubmit={handleSubmit}>
       <label htmlFor="replay-year">Year</label>
@@ -45,6 +53,7 @@ export function ReplayControls({
       <input id="replay-speed" value={speed} onChange={(e) => setSpeed(e.target.value)} />
 
       <button type="submit">Start replay</button>
+      <button type="button" onClick={handleStartLive}>Start live</button>
     </form>
   );
 }
