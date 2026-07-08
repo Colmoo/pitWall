@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 
-from app.fastf1_adapter import session_states_from_laps
+from app.fastf1_adapter import session_states_from_laps, track_layout_from_telemetry
 
 
 def _laps_df():
@@ -116,3 +116,27 @@ def test_session_states_from_laps_handles_missing_sector_time():
     assert ham_lap2.sector_1_time is None
     assert ham_lap2.sector_2_time == 32.0
     assert ham_lap2.sector_3_time == 31.5
+
+
+def test_track_layout_from_telemetry_downsamples_to_requested_points():
+    telemetry = pd.DataFrame({
+        "X": [float(i) for i in range(300)],
+        "Y": [float(i) * 2 for i in range(300)],
+    })
+    layout = track_layout_from_telemetry(telemetry, num_points=50)
+    assert len(layout) <= 50
+    assert len(layout) > 0
+    assert all(len(point) == 2 for point in layout)
+
+
+def test_track_layout_from_telemetry_preserves_point_order():
+    telemetry = pd.DataFrame({"X": [0.0, 1.0, 2.0, 3.0], "Y": [0.0, 1.0, 2.0, 3.0]})
+    layout = track_layout_from_telemetry(telemetry, num_points=4)
+    assert layout[0] == [0.0, 0.0]
+    assert layout[-1][0] <= 3.0
+
+
+def test_track_layout_from_telemetry_handles_fewer_points_than_requested():
+    telemetry = pd.DataFrame({"X": [0.0, 1.0, 2.0], "Y": [0.0, 1.0, 2.0]})
+    layout = track_layout_from_telemetry(telemetry, num_points=150)
+    assert len(layout) == 3
