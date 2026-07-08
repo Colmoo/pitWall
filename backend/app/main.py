@@ -5,7 +5,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from app.broadcaster import Broadcaster
-from app.fastf1_adapter import load_session_states
+from app.fastf1_adapter import load_session_states, load_track_layout
 from app.replay import ReplayEngine
 
 app = FastAPI(title="PitWall")
@@ -38,6 +38,14 @@ async def start_replay(req: ReplayRequest):
     )
     asyncio.create_task(_run_replay(states, req.speed))
     return {"status": "started", "states": len(states)}
+
+
+@app.get("/session/track-layout")
+async def track_layout(year: int, event: str, session_type: str):
+    points = load_track_layout(
+        year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
+    )
+    return {"points": points}
 
 
 @app.websocket("/ws/session")

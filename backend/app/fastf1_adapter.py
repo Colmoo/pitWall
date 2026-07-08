@@ -6,6 +6,10 @@ import pandas as pd
 from app.schema import DriverState, SessionState, Tire, TrackStatus
 
 
+def _sector_seconds(value) -> float | None:
+    return None if pd.isna(value) else value.total_seconds()
+
+
 def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> list[SessionState]:
     states: list[SessionState] = []
     best_lap_by_driver: dict[str, float] = {}
@@ -44,6 +48,10 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
                     last_lap_time=last_lap_seconds,
                     best_lap_time=best_so_far,
                     tire=Tire(compound=row["Compound"], age_laps=age_laps),
+                    lap_number=int(lap_number),
+                    sector_1_time=_sector_seconds(row["Sector1Time"]),
+                    sector_2_time=_sector_seconds(row["Sector2Time"]),
+                    sector_3_time=_sector_seconds(row["Sector3Time"]),
                 )
             )
 
@@ -62,9 +70,36 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
     return states
 
 
+def track_layout_from_telemetry(telemetry: pd.DataFrame, num_points: int = 150) -> list[list[float]]:
+    total = len(telemetry)
+    if total == 0:
+        return []
+    step = max(1, total // num_points)
+    sampled = telemetry.iloc[::step]
+    return [[float(row["X"]), float(row["Y"])] for _, row in sampled.iterrows()]
+
+
+_session_cache: dict[tuple[int, str, str], "fastf1.core.Session"] = {}
+
+
+def get_or_load_session(year: int, event: str, session_type: str, cache_dir: str) -> "fastf1.core.Session":
+    key = (year, event, session_type)
+    if key not in _session_cache:
+        fastf1.Cache.enable_cache(cache_dir)
+        session = fastf1.get_session(year, event, session_type)
+        session.load()
+        _session_cache[key] = session
+    return _session_cache[key]
+
+
+def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) -> list[list[float]]:
+    session = get_or_load_session(year, event, session_type, cache_dir)
+    fastest_lap = session.laps.pick_fastest()
+    telemetry = fastest_lap.get_telemetry()
+    return track_layout_from_telemetry(telemetry)
+
+
 def load_session_states(year: int, event: str, session_type: str, cache_dir: str) -> list[SessionState]:
-    fastf1.Cache.enable_cache(cache_dir)
-    session = fastf1.get_session(year, event, session_type)
-    session.load()
+    session = get_or_load_session(year, event, session_type, cache_dir)
     session_start = session.session_start_time.to_pydatetime() if session.session_start_time is not None else session.date
     return session_states_from_laps(session.laps, session_start)

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pandas as pd
 
-from app.fastf1_adapter import session_states_from_laps
+from app.fastf1_adapter import session_states_from_laps, track_layout_from_telemetry
 
 
 def _laps_df():
@@ -12,17 +12,25 @@ def _laps_df():
         # Driver VER: lap 1 then lap 2 (improves best lap)
         dict(Driver="VER", DriverNumber="1", Team="Red Bull", LapNumber=1,
              Position=1.0, LapTime=timedelta(seconds=92.0),
-             Time=timedelta(minutes=1, seconds=32), Compound="SOFT", TyreLife=1.0),
+             Time=timedelta(minutes=1, seconds=32), Compound="SOFT", TyreLife=1.0,
+             Sector1Time=timedelta(seconds=28.0), Sector2Time=timedelta(seconds=32.0),
+             Sector3Time=timedelta(seconds=32.0)),
         dict(Driver="VER", DriverNumber="1", Team="Red Bull", LapNumber=2,
              Position=1.0, LapTime=timedelta(seconds=90.0),
-             Time=timedelta(minutes=3, seconds=2), Compound="SOFT", TyreLife=2.0),
+             Time=timedelta(minutes=3, seconds=2), Compound="SOFT", TyreLife=2.0,
+             Sector1Time=timedelta(seconds=27.5), Sector2Time=timedelta(seconds=31.5),
+             Sector3Time=timedelta(seconds=31.0)),
         # Driver HAM: lap 1 then lap 2
         dict(Driver="HAM", DriverNumber="44", Team="Mercedes", LapNumber=1,
              Position=2.0, LapTime=timedelta(seconds=93.0),
-             Time=timedelta(minutes=1, seconds=33), Compound="MEDIUM", TyreLife=1.0),
+             Time=timedelta(minutes=1, seconds=33), Compound="MEDIUM", TyreLife=1.0,
+             Sector1Time=timedelta(seconds=28.5), Sector2Time=timedelta(seconds=32.5),
+             Sector3Time=timedelta(seconds=32.0)),
         dict(Driver="HAM", DriverNumber="44", Team="Mercedes", LapNumber=2,
              Position=2.0, LapTime=timedelta(seconds=91.5),
-             Time=timedelta(minutes=3, seconds=4, milliseconds=500), Compound="MEDIUM", TyreLife=2.0),
+             Time=timedelta(minutes=3, seconds=4, milliseconds=500), Compound="MEDIUM", TyreLife=2.0,
+             Sector1Time=pd.NaT, Sector2Time=timedelta(seconds=32.0),
+             Sector3Time=timedelta(seconds=31.5)),
     ]
     return pd.DataFrame(rows), session_start
 
@@ -88,3 +96,47 @@ def test_session_states_from_laps_best_lap_time_stays_pinned_to_faster_earlier_l
     ver_lap2 = next(d for d in states[1].drivers if d.abbreviation == "VER")
     assert ver_lap2.last_lap_time == 95.0
     assert ver_lap2.best_lap_time == 92.0  # stays pinned to lap 1, the faster lap
+
+
+def test_session_states_from_laps_includes_lap_number_and_sector_times():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    ver_lap1 = next(d for d in states[0].drivers if d.abbreviation == "VER")
+    assert ver_lap1.lap_number == 1
+    assert ver_lap1.sector_1_time == 28.0
+    assert ver_lap1.sector_2_time == 32.0
+    assert ver_lap1.sector_3_time == 32.0
+
+
+def test_session_states_from_laps_handles_missing_sector_time():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    # HAM's lap 2 (index 3 in the fixture rows) has NaT Sector1Time
+    ham_lap2 = next(d for d in states[1].drivers if d.abbreviation == "HAM")
+    assert ham_lap2.sector_1_time is None
+    assert ham_lap2.sector_2_time == 32.0
+    assert ham_lap2.sector_3_time == 31.5
+
+
+def test_track_layout_from_telemetry_downsamples_to_requested_points():
+    telemetry = pd.DataFrame({
+        "X": [float(i) for i in range(300)],
+        "Y": [float(i) * 2 for i in range(300)],
+    })
+    layout = track_layout_from_telemetry(telemetry, num_points=50)
+    assert len(layout) <= 50
+    assert len(layout) > 0
+    assert all(len(point) == 2 for point in layout)
+
+
+def test_track_layout_from_telemetry_preserves_point_order():
+    telemetry = pd.DataFrame({"X": [0.0, 1.0, 2.0, 3.0], "Y": [0.0, 1.0, 2.0, 3.0]})
+    layout = track_layout_from_telemetry(telemetry, num_points=4)
+    assert layout[0] == [0.0, 0.0]
+    assert layout[-1][0] <= 3.0
+
+
+def test_track_layout_from_telemetry_handles_fewer_points_than_requested():
+    telemetry = pd.DataFrame({"X": [0.0, 1.0, 2.0], "Y": [0.0, 1.0, 2.0]})
+    layout = track_layout_from_telemetry(telemetry, num_points=150)
+    assert len(layout) == 3
