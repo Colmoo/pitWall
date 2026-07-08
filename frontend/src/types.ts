@@ -17,6 +17,10 @@ export interface DriverState {
   tire: Tire;
   x: number | null;
   y: number | null;
+  lap_number: number | null;
+  sector_1_time: number | null;
+  sector_2_time: number | null;
+  sector_3_time: number | null;
 }
 
 export interface SessionState {

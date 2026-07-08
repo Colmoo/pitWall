@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import type { SessionState } from "../types";
 
-export function useSessionSocket(url: string): SessionState | null {
-  const [state, setState] = useState<SessionState | null>(null);
+export function useSessionSocket(url: string): SessionState[] {
+  const [history, setHistory] = useState<SessionState[]>([]);
 
   useEffect(() => {
+    setHistory([]);
     const socket = new WebSocket(url);
     socket.onmessage = (event: { data: string }) => {
-      setState(JSON.parse(event.data) as SessionState);
+      const state = JSON.parse(event.data) as SessionState;
+      setHistory((prev) => [...prev, state]);
     };
     return () => socket.close();
   }, [url]);
 
-  return state;
+  return history;
 }
