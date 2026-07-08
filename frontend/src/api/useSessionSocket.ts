@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { SessionState } from "../types";
 
-export function useSessionSocket(url: string): SessionState[] {
+export function useSessionSocket(url: string, resetKey?: unknown): SessionState[] {
   const [history, setHistory] = useState<SessionState[]>([]);
 
   useEffect(() => {
@@ -12,7 +12,7 @@ export function useSessionSocket(url: string): SessionState[] {
       setHistory((prev) => [...prev, state]);
     };
     return () => socket.close();
-  }, [url]);
+  }, [url, resetKey]);
 
   return history;
 }

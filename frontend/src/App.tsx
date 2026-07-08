@@ -13,9 +13,9 @@ const TABS = ["Timing Tower", "Track Map", "Tire Strategy", "Sector Times"] as c
 type Tab = (typeof TABS)[number];
 
 export default function App() {
-  const history = useSessionSocket(WS_URL);
-  const latest = history.length > 0 ? history[history.length - 1] : null;
   const [sessionParams, setSessionParams] = useState<{ year: number; event: string; sessionType: string } | null>(null);
+  const history = useSessionSocket(WS_URL, sessionParams);
+  const latest = history.length > 0 ? history[history.length - 1] : null;
   const [activeTab, setActiveTab] = useState<Tab>("Timing Tower");
 
   useEffect(() => {

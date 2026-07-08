@@ -39,3 +39,29 @@ test("accumulates each received message into history, in order", () => {
   expect(result.current[0].timestamp).toBe("t1");
   expect(result.current[1].timestamp).toBe("t2");
 });
+
+test("resets history when resetKey changes, even if url stays the same", () => {
+  // @ts-expect-error test double
+  global.WebSocket = FakeWebSocket;
+  const { result, rerender } = renderHook(
+    ({ resetKey }: { resetKey: unknown }) => useSessionSocket("ws://test/ws/session", resetKey),
+    { initialProps: { resetKey: "session-1" } }
+  );
+  const firstSocket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+
+  act(() => {
+    firstSocket.onmessage?.({ data: JSON.stringify(sampleState("t1")) });
+  });
+  expect(result.current).toHaveLength(1);
+
+  rerender({ resetKey: "session-2" });
+
+  expect(result.current).toEqual([]);
+
+  const secondSocket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+  act(() => {
+    secondSocket.onmessage?.({ data: JSON.stringify(sampleState("t2")) });
+  });
+  expect(result.current).toHaveLength(1);
+  expect(result.current[0].timestamp).toBe("t2");
+});
