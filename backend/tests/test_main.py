@@ -34,3 +34,15 @@ def test_replay_and_websocket_stream(monkeypatch):
         second = ws.receive_json()
         assert first["track_status"] == "green"
         assert second["timestamp"] != first["timestamp"]
+
+
+def test_track_layout_endpoint_returns_points(monkeypatch):
+    monkeypatch.setattr(
+        "app.main.load_track_layout",
+        lambda **kwargs: [[0.0, 0.0], [1.0, 2.0], [2.0, 4.0]],
+    )
+    resp = client.get("/session/track-layout", params={
+        "year": 2026, "event": "Silverstone", "session_type": "R",
+    })
+    assert resp.status_code == 200
+    assert resp.json() == {"points": [[0.0, 0.0], [1.0, 2.0], [2.0, 4.0]]}
