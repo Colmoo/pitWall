@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
 
-from app.live_adapter import session_state_from_live_tree
+import httpx
+import pytest
+
+from app.live_adapter import LiveAdapter, session_state_from_live_tree
 from app.schema import TrackStatus
 
 
@@ -90,3 +93,28 @@ def test_session_state_from_live_tree_defaults_unknown_track_status_to_green():
 def test_session_state_from_live_tree_returns_none_when_data_incomplete():
     assert session_state_from_live_tree({"Heartbeat": {"Utc": "now"}}, datetime.now(timezone.utc)) is None
     assert session_state_from_live_tree({"DriverList": {"1": {"Tla": "VER"}}}, datetime.now(timezone.utc)) is None
+
+
+@pytest.mark.asyncio
+async def test_live_adapter_stream_yields_states_from_sse_events():
+    sse_body = (
+        'event: initial\n'
+        'data: {"DriverList": {"1": {"Tla": "VER", "TeamName": "Red Bull"}}, '
+        '"TimingData": {"Lines": {"1": {"Position": "1", "LastLapTime": {"Value": "1:30.000"}}}}, '
+        '"TrackStatus": {"Status": "1"}}\n\n'
+        'event: update\n'
+        'data: {"TimingData": {"Lines": {"1": {"Position": "1", "LastLapTime": {"Value": "1:29.500"}}}}}\n\n'
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=sse_body)
+
+    transport = httpx.MockTransport(handler)
+    adapter = LiveAdapter("http://fake/api/realtime")
+    adapter._transport = transport  # test seam, see Step 3
+
+    states = [state async for state in adapter.stream()]
+
+    assert len(states) == 2
+    assert states[0].drivers[0].last_lap_time == 90.0
+    assert states[1].drivers[0].last_lap_time == 89.5
