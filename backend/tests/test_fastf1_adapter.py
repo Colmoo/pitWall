@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from app.fastf1_adapter import session_states_from_laps, track_layout_from_telemetry
 
@@ -140,3 +141,20 @@ def test_track_layout_from_telemetry_handles_fewer_points_than_requested():
     telemetry = pd.DataFrame({"X": [0.0, 1.0, 2.0], "Y": [0.0, 1.0, 2.0]})
     layout = track_layout_from_telemetry(telemetry, num_points=150)
     assert len(layout) == 3
+
+
+def test_session_states_from_laps_computes_gap_to_leader_and_ahead():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+
+    ver_lap1 = next(d for d in states[0].drivers if d.abbreviation == "VER")
+    ham_lap1 = next(d for d in states[0].drivers if d.abbreviation == "HAM")
+    assert ver_lap1.gap_to_leader is None  # leader has no gap
+    assert ver_lap1.gap_to_ahead is None
+    assert ham_lap1.gap_to_leader == pytest.approx(1.0)  # HAM Time 1:33 - VER Time 1:32
+    assert ham_lap1.gap_to_ahead == pytest.approx(1.0)   # only VER ahead
+
+    ver_lap2 = next(d for d in states[1].drivers if d.abbreviation == "VER")
+    ham_lap2 = next(d for d in states[1].drivers if d.abbreviation == "HAM")
+    assert ver_lap2.gap_to_leader is None
+    assert ham_lap2.gap_to_leader == pytest.approx(2.5)  # HAM Time 3:04.5 - VER Time 3:02

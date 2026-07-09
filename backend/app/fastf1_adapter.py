@@ -18,7 +18,9 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
         lap_time_at_end = group["Time"].max()
         timestamp = session_start + lap_time_at_end
 
-        drivers: list[DriverState] = []
+        # entries pairs each built DriverState with its raw cumulative session
+        # Time, so gaps can be computed after sorting by classification order.
+        entries: list[tuple[DriverState, "pd.Timedelta"]] = []
         for _, row in group.iterrows():
             # Real FastF1 data has NaN/NaT for out-laps, in-laps, red-flag laps,
             # and unclassified/retired drivers. Skip rows we can't build a usable
@@ -35,35 +37,41 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
 
             age_laps = 0 if pd.isna(row["TyreLife"]) else int(row["TyreLife"])
 
-            drivers.append(
-                DriverState(
-                    driver_number=number,
-                    abbreviation=row["Driver"],
-                    team=row["Team"],
-                    # ponytail: replay v1 has no live gap/interval data from FastF1 laps table;
-                    # live mode (future plan) fills these from f1-dash.
-                    position=int(row["Position"]),
-                    gap_to_leader=None,
-                    gap_to_ahead=None,
-                    last_lap_time=last_lap_seconds,
-                    best_lap_time=best_so_far,
-                    tire=Tire(compound=row["Compound"], age_laps=age_laps),
-                    lap_number=int(lap_number),
-                    sector_1_time=_sector_seconds(row["Sector1Time"]),
-                    sector_2_time=_sector_seconds(row["Sector2Time"]),
-                    sector_3_time=_sector_seconds(row["Sector3Time"]),
-                )
+            driver_state = DriverState(
+                driver_number=number,
+                abbreviation=row["Driver"],
+                team=row["Team"],
+                position=int(row["Position"]),
+                gap_to_leader=None,
+                gap_to_ahead=None,
+                last_lap_time=last_lap_seconds,
+                best_lap_time=best_so_far,
+                tire=Tire(compound=row["Compound"], age_laps=age_laps),
+                lap_number=int(lap_number),
+                sector_1_time=_sector_seconds(row["Sector1Time"]),
+                sector_2_time=_sector_seconds(row["Sector2Time"]),
+                sector_3_time=_sector_seconds(row["Sector3Time"]),
             )
+            entries.append((driver_state, row["Time"]))
 
-        if not drivers:
+        if not entries:
             continue
+
+        entries.sort(key=lambda pair: pair[0].position)
+        leader_time = entries[0][1]
+        previous_time = None
+        for driver_state, row_time in entries:
+            is_leader = driver_state is entries[0][0]
+            driver_state.gap_to_leader = None if is_leader else (row_time - leader_time).total_seconds()
+            driver_state.gap_to_ahead = None if previous_time is None else (row_time - previous_time).total_seconds()
+            previous_time = row_time
 
         states.append(
             SessionState(
                 timestamp=timestamp,
                 # ponytail: track status omitted in replay v1, defaults to green.
                 track_status=TrackStatus.GREEN,
-                drivers=sorted(drivers, key=lambda d: d.position),
+                drivers=[pair[0] for pair in entries],
             )
         )
 
