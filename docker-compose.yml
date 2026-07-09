@@ -7,7 +7,7 @@ services:
     environment:
       - FASTF1_CACHE_DIR=/data/fastf1_cache
       - OLLAMA_HOST=http://host.docker.internal:11434
-      - OLLAMA_MODEL=gemma3:4b
+      - OLLAMA_MODEL=gemma4:latest
     volumes:
       - fastf1_cache:/data/fastf1_cache
 
