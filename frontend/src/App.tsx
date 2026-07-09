@@ -7,13 +7,18 @@ import { TrackMap } from "./panels/TrackMap";
 import { TireStrategy } from "./panels/TireStrategy";
 import { SectorTimes } from "./panels/SectorTimes";
 import { OverviewPanel } from "./panels/OverviewPanel";
+import { useAiNotes } from "./api/useAiNotes";
+import { RaceEngineerNotes } from "./panels/RaceEngineerNotes";
+import { AiChat } from "./panels/AiChat";
 
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:8000/ws/session";
+const AI_NOTES_WS_URL = import.meta.env.VITE_BACKEND_AI_NOTES_WS_URL ?? "ws://localhost:8000/ws/ai-notes";
 
 export default function App() {
   const [sessionParams, setSessionParams] = useState<{ year: number; event: string; sessionType: string } | null>(null);
   const history = useSessionSocket(WS_URL, sessionParams);
   const latest = history.length > 0 ? history[history.length - 1] : null;
+  const notes = useAiNotes(AI_NOTES_WS_URL);
 
   return (
     <div>
@@ -43,6 +48,14 @@ export default function App() {
           <div className="pitwall-panel pitwall-circuit-bezel">
             <div className="pitwall-panel-title">Circuit</div>
             <TrackMap state={latest} sessionParams={sessionParams} />
+          </div>
+          <div className="pitwall-panel">
+            <div className="pitwall-panel-title">Race Engineer Notes</div>
+            <RaceEngineerNotes notes={notes} />
+          </div>
+          <div className="pitwall-panel">
+            <div className="pitwall-panel-title">Ask The Engineer</div>
+            <AiChat />
           </div>
         </div>
       </main>

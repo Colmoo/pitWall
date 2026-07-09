@@ -29,3 +29,9 @@ test("replay and live controls remain visible alongside all panels", () => {
   expect(screen.getByRole("button", { name: /start replay/i })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /start live/i })).toBeInTheDocument();
 });
+
+test("renders Race Engineer Notes and AI Chat panels alongside everything else", () => {
+  render(<App />);
+  expect(screen.getByText(/no notes yet/i)).toBeInTheDocument();
+  expect(screen.getByLabelText(/ask a question/i)).toBeInTheDocument();
+});
