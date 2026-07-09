@@ -42,7 +42,11 @@ async def call_ollama(
     prompt: str, host: str, model: str, transport: httpx.AsyncBaseTransport | None = None
 ) -> str | None:
     try:
-        async with httpx.AsyncClient(transport=transport, timeout=30.0) as client:
+        # ponytail: local CPU-inference models can take well over 30s per call
+        # (measured ~20s for a trivial prompt on unaccelerated hardware) - a
+        # timeout equal to the note loop's poll interval was cutting real,
+        # in-flight responses off. 90s gives room without hanging forever.
+        async with httpx.AsyncClient(transport=transport, timeout=90.0) as client:
             response = await client.post(
                 f"{host}/api/generate",
                 json={"model": model, "prompt": prompt, "stream": False},
