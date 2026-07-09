@@ -1,0 +1,28 @@
+import { render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom";
+import { OverviewPanel } from "./OverviewPanel";
+import type { SessionState } from "../types";
+
+test("shows placeholder dashes when no state yet", () => {
+  render(<OverviewPanel state={null} />);
+  expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(3);
+});
+
+test("shows track status, leader, and lap from the latest state", () => {
+  const state: SessionState = {
+    timestamp: "t1",
+    track_status: "yellow",
+    drivers: [
+      {
+        driver_number: "1", abbreviation: "VER", team: "Red Bull", position: 1,
+        gap_to_leader: null, gap_to_ahead: null, last_lap_time: null, best_lap_time: null,
+        tire: { compound: "SOFT", age_laps: 1 }, x: null, y: null,
+        lap_number: 12, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+      },
+    ],
+  };
+  render(<OverviewPanel state={state} />);
+  expect(screen.getByText("YELLOW")).toBeInTheDocument();
+  expect(screen.getByText("VER")).toBeInTheDocument();
+  expect(screen.getByText("12")).toBeInTheDocument();
+});
