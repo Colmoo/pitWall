@@ -101,5 +101,8 @@ def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) 
 
 def load_session_states(year: int, event: str, session_type: str, cache_dir: str) -> list[SessionState]:
     session = get_or_load_session(year, event, session_type, cache_dir)
-    session_start = session.session_start_time.to_pydatetime() if session.session_start_time is not None else session.date
+    # ponytail: session.session_start_time is a Timedelta (session-relative), not
+    # an absolute datetime like session.date - use session.date as the anchor for
+    # lap "Time" deltas, which is accurate enough for display purposes.
+    session_start = session.date.to_pydatetime()
     return session_states_from_laps(session.laps, session_start)
