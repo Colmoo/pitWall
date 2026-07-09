@@ -137,3 +137,51 @@ def test_session_task_exception_is_logged_not_swallowed(monkeypatch, caplog):
     # "unretrieved" - calling it again here just confirms what was raised.
     assert isinstance(task.exception(), ValueError)
     assert "Session task failed" in caplog.text
+
+
+def test_run_ai_note_cycle_publishes_a_note(monkeypatch):
+    from datetime import datetime, timezone
+    from app.schema import DriverState, SessionState, Tire, TrackStatus
+
+    state = SessionState(
+        timestamp=datetime.now(timezone.utc), track_status=TrackStatus.GREEN,
+        drivers=[
+            DriverState(
+                driver_number="1", abbreviation="VER", team="Red Bull", position=1,
+                gap_to_leader=None, gap_to_ahead=None, last_lap_time=None, best_lap_time=90.0,
+                tire=Tire(compound="SOFT", age_laps=1), lap_number=5,
+                sector_1_time=None, sector_2_time=None, sector_3_time=None,
+            )
+        ],
+    )
+    monkeypatch.setattr(app_module, "_latest_state", state)
+    monkeypatch.setattr(app_module, "_previous_state_for_ai", None)
+
+    async def fake_call_ollama(prompt, host, model, transport=None):
+        assert "Session start." in prompt
+        return "Lights out, VER leads."
+
+    monkeypatch.setattr(app_module, "call_ollama", fake_call_ollama)
+
+    with client.websocket_connect("/ws/ai-notes") as ws:
+        # ponytail: client.portal (populated by TestClient.__enter__, active since
+        # module load) runs coroutines on the SAME event loop the websocket/queues
+        # live on — asyncio.run() here would create a second, disconnected loop and
+        # the websocket would never see the published note.
+        client.portal.call(app_module._run_ai_note_cycle)
+        note = ws.receive_json()
+        assert note["text"] == "Lights out, VER leads."
+        assert "timestamp" in note
+
+    assert app_module._previous_state_for_ai is state
+
+
+def test_run_ai_note_cycle_does_nothing_when_no_state_yet(monkeypatch):
+    monkeypatch.setattr(app_module, "_latest_state", None)
+
+    async def fail_if_called(*args, **kwargs):
+        raise AssertionError("call_ollama should not be called when there is no state yet")
+
+    monkeypatch.setattr(app_module, "call_ollama", fail_if_called)
+
+    client.portal.call(app_module._run_ai_note_cycle)

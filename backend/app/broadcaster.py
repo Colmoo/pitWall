@@ -1,6 +1,5 @@
 import asyncio
-
-from app.schema import SessionState
+from typing import Any
 
 
 class Broadcaster:
@@ -16,6 +15,6 @@ class Broadcaster:
         if queue in self._subscribers:
             self._subscribers.remove(queue)
 
-    async def publish(self, state: SessionState) -> None:
+    async def publish(self, message: Any) -> None:
         for queue in list(self._subscribers):
-            await queue.put(state)
+            await queue.put(message)
