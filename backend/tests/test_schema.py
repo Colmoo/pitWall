@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from app.schema import SessionState, DriverState, Tire, TrackStatus
+from app.schema import SessionState, DriverState, Tire, TrackStatus, WeatherSnapshot, RaceControlMessage
 
 
 def test_session_state_roundtrip():
@@ -59,3 +59,30 @@ def test_driver_state_lap_number_and_sectors_default_to_none():
     assert driver.sector_1_time is None
     assert driver.sector_2_time is None
     assert driver.sector_3_time is None
+
+
+def test_session_state_defaults_weather_and_race_control_to_empty():
+    state = SessionState(
+        timestamp=datetime(2026, 7, 9, tzinfo=timezone.utc),
+        track_status=TrackStatus.GREEN,
+        drivers=[],
+    )
+    assert state.weather is None
+    assert state.race_control_messages == []
+
+
+def test_weather_snapshot_round_trips():
+    weather = WeatherSnapshot(air_temp=22.1, track_temp=36.2, humidity=51.0, wind_speed=2.7, rainfall=False)
+    assert weather.air_temp == 22.1
+    assert weather.rainfall is False
+
+
+def test_race_control_message_round_trips():
+    message = RaceControlMessage(
+        timestamp=datetime(2026, 7, 9, 13, 5, tzinfo=timezone.utc),
+        category="Flag",
+        message="GREEN LIGHT - PIT EXIT OPEN",
+        flag="GREEN",
+    )
+    assert message.category == "Flag"
+    assert message.flag == "GREEN"

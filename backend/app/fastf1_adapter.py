@@ -3,7 +3,7 @@ from datetime import datetime
 import fastf1
 import pandas as pd
 
-from app.schema import DriverState, SessionState, Tire, TrackStatus
+from app.schema import DriverState, RaceControlMessage, SessionState, Tire, TrackStatus, WeatherSnapshot
 
 
 def _sector_seconds(value) -> float | None:
@@ -87,6 +87,44 @@ def track_layout_from_telemetry(telemetry: pd.DataFrame, num_points: int = 150) 
     return [[float(row["X"]), float(row["Y"])] for _, row in sampled.iterrows()]
 
 
+def nearest_weather_sample(weather_data: pd.DataFrame, elapsed) -> WeatherSnapshot | None:
+    if weather_data.empty:
+        return None
+    idx = (weather_data["Time"] - elapsed).abs().idxmin()
+    row = weather_data.loc[idx]
+    return WeatherSnapshot(
+        air_temp=float(row["AirTemp"]),
+        track_temp=float(row["TrackTemp"]),
+        humidity=float(row["Humidity"]),
+        wind_speed=float(row["WindSpeed"]),
+        rainfall=bool(row["Rainfall"]),
+    )
+
+
+def attach_weather(states: list[SessionState], weather_data: pd.DataFrame, session_start: datetime) -> None:
+    for state in states:
+        elapsed = state.timestamp - session_start
+        state.weather = nearest_weather_sample(weather_data, elapsed)
+
+
+def race_control_messages_up_to(rcm: pd.DataFrame, timestamp: datetime) -> list[RaceControlMessage]:
+    subset = rcm[rcm["Time"] <= timestamp]
+    return [
+        RaceControlMessage(
+            timestamp=row["Time"].to_pydatetime() if hasattr(row["Time"], "to_pydatetime") else row["Time"],
+            category=row["Category"],
+            message=row["Message"],
+            flag=None if pd.isna(row["Flag"]) else row["Flag"],
+        )
+        for _, row in subset.iterrows()
+    ]
+
+
+def attach_race_control_messages(states: list[SessionState], rcm: pd.DataFrame) -> None:
+    for state in states:
+        state.race_control_messages = race_control_messages_up_to(rcm, state.timestamp)
+
+
 _session_cache: dict[tuple[int, str, str], "fastf1.core.Session"] = {}
 
 
@@ -113,4 +151,7 @@ def load_session_states(year: int, event: str, session_type: str, cache_dir: str
     # an absolute datetime like session.date - use session.date as the anchor for
     # lap "Time" deltas, which is accurate enough for display purposes.
     session_start = session.date.to_pydatetime()
-    return session_states_from_laps(session.laps, session_start)
+    states = session_states_from_laps(session.laps, session_start)
+    attach_weather(states, session.weather_data, session_start)
+    attach_race_control_messages(states, session.race_control_messages)
+    return states

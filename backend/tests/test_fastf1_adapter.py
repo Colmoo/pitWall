@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app.fastf1_adapter import session_states_from_laps, track_layout_from_telemetry
+from app.fastf1_adapter import attach_weather, attach_race_control_messages, session_states_from_laps, track_layout_from_telemetry
 
 
 def _laps_df():
@@ -158,3 +158,44 @@ def test_session_states_from_laps_computes_gap_to_leader_and_ahead():
     ham_lap2 = next(d for d in states[1].drivers if d.abbreviation == "HAM")
     assert ver_lap2.gap_to_leader is None
     assert ham_lap2.gap_to_leader == pytest.approx(2.5)  # HAM Time 3:04.5 - VER Time 3:02
+
+
+def test_attach_weather_picks_nearest_sample_by_elapsed_time():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    weather_data = pd.DataFrame([
+        dict(Time=timedelta(seconds=0), AirTemp=22.0, TrackTemp=35.0, Humidity=50.0, WindSpeed=2.0, Rainfall=False),
+        dict(Time=timedelta(minutes=3), AirTemp=23.0, TrackTemp=37.0, Humidity=48.0, WindSpeed=3.0, Rainfall=False),
+    ])
+
+    attach_weather(states, weather_data, session_start)
+
+    # lap 1 ends at session Time 1:33 (max of VER 1:32 + HAM 1:33) -> closer to the Time=3:00 sample
+    assert states[0].weather.air_temp == 23.0
+    # lap 2 ends at session Time 3:04.5 -> closer to the Time=3:00 sample
+    assert states[1].weather.air_temp == 23.0
+    assert states[1].weather.rainfall is False
+
+
+def test_attach_weather_handles_empty_weather_data():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    attach_weather(states, pd.DataFrame(columns=["Time", "AirTemp", "TrackTemp", "Humidity", "WindSpeed", "Rainfall"]), session_start)
+    assert states[0].weather is None
+
+
+def test_attach_race_control_messages_only_includes_messages_up_to_timestamp():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    # states[0].timestamp = session_start + 1:32, states[1].timestamp = session_start + 3:04.5
+    rcm = pd.DataFrame([
+        dict(Time=session_start + timedelta(seconds=30), Category="Other", Message="PIT EXIT OPEN", Flag=None),
+        dict(Time=session_start + timedelta(minutes=3), Category="Flag", Message="YELLOW FLAG", Flag="YELLOW"),
+    ])
+
+    attach_race_control_messages(states, rcm)
+
+    assert len(states[0].race_control_messages) == 1
+    assert states[0].race_control_messages[0].message == "PIT EXIT OPEN"
+    assert len(states[1].race_control_messages) == 2
+    assert states[1].race_control_messages[1].flag == "YELLOW"
