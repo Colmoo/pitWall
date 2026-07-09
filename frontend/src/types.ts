@@ -28,3 +28,8 @@ export interface SessionState {
   track_status: TrackStatus;
   drivers: DriverState[];
 }
+
+export interface AiNote {
+  timestamp: string;
+  text: string;
+}
