@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import App from "./App";
 
@@ -14,29 +14,18 @@ beforeEach(() => {
   global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ points: [] }) });
 });
 
-test("shows Timing Tower by default and switches panels on tab click", () => {
+test("renders all panels simultaneously with no tab switching", () => {
   render(<App />);
-  expect(screen.getByText(/waiting for session data/i)).toBeInTheDocument();
-
-  fireEvent.click(screen.getByRole("button", { name: /tire strategy/i }));
-  expect(screen.getAllByText(/waiting for session data/i).length).toBeGreaterThan(0);
+  // TimingTower, TireStrategy, and SectorTimes each show their own "waiting" message at once
+  expect(screen.getAllByText(/waiting for session data/i).length).toBeGreaterThanOrEqual(3);
+  // Track Map shows its own independent placeholder
+  expect(screen.getByText(/start a session/i)).toBeInTheDocument();
+  // Overview panel is present
+  expect(screen.getByText(/overview/i)).toBeInTheDocument();
 });
 
-test("switches to Track Map tab via number key 2", () => {
+test("replay and live controls remain visible alongside all panels", () => {
   render(<App />);
-  fireEvent.keyDown(window, { key: "2" });
-  expect(screen.getByText(/start a session/i)).toBeInTheDocument();
-});
-
-test("number key presses while a form input is focused do not switch tabs", () => {
-  render(<App />);
-  fireEvent.click(screen.getByRole("button", { name: /track map/i }));
-  expect(screen.getByText(/start a session/i)).toBeInTheDocument();
-
-  const yearInput = screen.getByLabelText(/year/i);
-  yearInput.focus();
-  fireEvent.keyDown(yearInput, { key: "1" });
-
-  // still on Track Map, not hijacked back to Timing Tower
-  expect(screen.getByText(/start a session/i)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /start replay/i })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /start live/i })).toBeInTheDocument();
 });
