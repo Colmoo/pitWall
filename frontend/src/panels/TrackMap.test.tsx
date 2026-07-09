@@ -42,3 +42,14 @@ test("plots a dot for each driver with known x/y", async () => {
   render(<TrackMap state={state} sessionParams={{ year: 2023, event: "Silverstone", sessionType: "R" }} />);
   await waitFor(() => expect(screen.getByTestId("driver-dot-1")).toBeInTheDocument());
 });
+
+test("shows the circuit name from sessionParams below the map", async () => {
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ points: [[0, 0], [10, 0], [10, 10], [0, 10]] }),
+  });
+
+  render(<TrackMap state={null} sessionParams={{ year: 2023, event: "Silverstone", sessionType: "R" }} />);
+
+  await waitFor(() => expect(screen.getByText("Silverstone")).toBeInTheDocument());
+});

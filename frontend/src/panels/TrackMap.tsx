@@ -39,21 +39,32 @@ export function TrackMap({ state, sessionParams }: { state: SessionState | null;
   const driversWithPosition = state?.drivers.filter((d) => d.x !== null && d.y !== null) ?? [];
 
   return (
-    <svg
-      viewBox={`${minX - padding} ${minY - padding} ${width + padding * 2} ${height + padding * 2}`}
-      style={{ width: "100%", height: "auto" }}
-    >
-      <path data-testid="track-outline" d={pathD} fill="none" stroke="#3ecbff" strokeWidth={width * 0.004} />
-      {driversWithPosition.map((d) => (
+    <>
+      <svg
+        viewBox={`${minX - padding} ${minY - padding} ${width + padding * 2} ${height + padding * 2}`}
+        style={{ width: "100%", height: "auto" }}
+      >
         <circle
-          key={d.driver_number}
-          data-testid={`driver-dot-${d.driver_number}`}
-          cx={d.x as number}
-          cy={d.y as number}
-          r={width * 0.01}
-          fill="#facc15"
+          cx={minX + width / 2}
+          cy={minY + height / 2}
+          r={Math.max(width, height) / 2 + padding * 0.6}
+          fill="none"
+          stroke="#1a1d1f"
+          strokeWidth={width * 0.003}
         />
-      ))}
-    </svg>
+        <path data-testid="track-outline" d={pathD} fill="none" stroke="#3ecbff" strokeWidth={width * 0.004} />
+        {driversWithPosition.map((d) => (
+          <circle
+            key={d.driver_number}
+            data-testid={`driver-dot-${d.driver_number}`}
+            cx={d.x as number}
+            cy={d.y as number}
+            r={width * 0.01}
+            fill="#facc15"
+          />
+        ))}
+      </svg>
+      {sessionParams && <div className="pitwall-circuit-name">{sessionParams.event}</div>}
+    </>
   );
 }
