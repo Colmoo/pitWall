@@ -3,6 +3,7 @@ import logging
 import os
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.broadcaster import Broadcaster
@@ -11,6 +12,14 @@ from app.live_adapter import LiveAdapter
 from app.replay import ReplayEngine
 
 app = FastAPI(title="PitWall")
+# ponytail: wide-open CORS for a local dev slice with no auth/cookies involved;
+# tighten to explicit origins if this is ever deployed beyond localhost/dev compose.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 broadcaster = Broadcaster()
 CACHE_DIR = os.environ.get("FASTF1_CACHE_DIR", "/tmp/fastf1_cache")
 logger = logging.getLogger(__name__)

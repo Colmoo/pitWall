@@ -14,6 +14,11 @@ def test_health():
     assert resp.json() == {"status": "ok"}
 
 
+def test_cors_allows_frontend_origin():
+    resp = client.get("/health", headers={"Origin": "http://localhost:5173"})
+    assert resp.headers.get("access-control-allow-origin") == "*"
+
+
 from unittest.mock import patch
 from datetime import datetime, timezone
 from app.schema import SessionState, TrackStatus
