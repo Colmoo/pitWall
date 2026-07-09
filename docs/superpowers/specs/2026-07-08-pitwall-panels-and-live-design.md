@@ -119,6 +119,31 @@ official live-timing SignalR feed, which f1-dash subscribes to directly
   active session/broadcast source at a time — matches the original spec's "session controller
   owns switching between live and replay").
 
+## UI redesign: dense single-screen dashboard (added 2026-07-09)
+Following user feedback that the tab-switcher shell felt "ugly" and a reference photo of the
+APXGP engineering-telemetry display (from the Apple F1 film) plus a mockup screenshot in the
+same style, the frontend shell is redesigned as one always-visible dense dashboard — no tab
+switching, every panel on screen at once, matching how a real pitwall's wall of monitors reads
+at a glance.
+
+**Design tokens** (derived directly from the reference, not freelanced):
+- Color: background `#050607`, panel `#0a0c10`, hairline border `#1a1d1f`, primary text
+  `#e5e7eb`, label gray `#6b7280`, accents cyan `#3ecbff` (primary/speed), yellow `#facc15`
+  (tires/caution), green `#4ade80` (good/green flag), red `#f87171` (danger/slow).
+- Type: labels are small uppercase system sans with letter-spacing; data values are monospace
+  with tabular numerals (matching the reference's technical-readout feel).
+- Layout: CSS grid, three columns (fixed-width left sidebar, fluid center, fixed-width right
+  sidebar), header strip across the top. Left column: session overview stats + Tire Strategy
+  stint bars. Center: Timing Tower (large, dominant, like the reference's big data table) above
+  Sector Times. Right column: Track Map inside a circular bezel — this is the signature element,
+  directly echoing the reference's most distinctive piece (the round GPS-trace odometer-style
+  circuit view).
+- The reference mockup shows single-car engineering telemetry (RPM, throttle, ERS, tire
+  pressures) that PitWall's data model doesn't have (PitWall shows multi-driver timing data, not
+  one car's live sensor telemetry) — the redesign adopts the reference's *visual language* (dense
+  grid, black background, uppercase micro-labels, colored values, circular track bezel) applied
+  to PitWall's actual panels, not a literal recreation of telemetry channels that don't exist.
+
 ## Out of scope for these two plans (unchanged from original spec)
 AI/Ollama analysis layer (separate future plan). Pixel-perfect visual polish (separate future
 design pass, once the user is ready to lock exact typography/spacing/motion).
