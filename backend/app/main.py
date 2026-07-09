@@ -7,7 +7,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app.ai_adapter import call_ollama, summarize_changes
+from app.ai_adapter import call_ollama, describe_state, summarize_changes
 from app.broadcaster import Broadcaster
 from app.fastf1_adapter import load_session_states, load_track_layout
 from app.live_adapter import LiveAdapter
@@ -157,6 +157,21 @@ async def session_socket(websocket: WebSocket):
         pass
     finally:
         broadcaster.unsubscribe(queue)
+
+
+class ChatRequest(BaseModel):
+    question: str
+
+
+@app.post("/ai/chat")
+async def ai_chat(req: ChatRequest):
+    context = "No session data yet." if _latest_state is None else describe_state(_latest_state)
+    prompt = (
+        "You are a Formula 1 race engineer. Current session context: "
+        f"{context} Question: {req.question} Answer concisely."
+    )
+    answer = await call_ollama(prompt, OLLAMA_HOST, OLLAMA_MODEL)
+    return {"answer": answer or "Unable to reach the AI assistant right now."}
 
 
 @app.websocket("/ws/ai-notes")
