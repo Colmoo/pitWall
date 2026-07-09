@@ -1,15 +1,18 @@
 import asyncio
 import logging
 import os
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from app.ai_adapter import call_ollama, describe_state, summarize_changes
 from app.broadcaster import Broadcaster
 from app.fastf1_adapter import load_session_states, load_track_layout
 from app.live_adapter import LiveAdapter
 from app.replay import ReplayEngine
+from app.schema import SessionState
 
 app = FastAPI(title="PitWall")
 # ponytail: wide-open CORS for a local dev slice with no auth/cookies involved;
@@ -23,6 +26,14 @@ app.add_middleware(
 broadcaster = Broadcaster()
 CACHE_DIR = os.environ.get("FASTF1_CACHE_DIR", "/tmp/fastf1_cache")
 logger = logging.getLogger(__name__)
+
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://host.docker.internal:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
+AI_NOTE_INTERVAL_SECONDS = 30
+
+ai_broadcaster = Broadcaster()
+_latest_state: SessionState | None = None
+_previous_state_for_ai: SessionState | None = None
 
 _current_task: asyncio.Task | None = None
 
@@ -55,10 +66,49 @@ class ReplayRequest(BaseModel):
     speed: float = 1.0
 
 
+async def _publish_state(state: SessionState) -> None:
+    global _latest_state
+    _latest_state = state
+    await broadcaster.publish(state)
+
+
+async def _run_ai_note_cycle() -> None:
+    global _previous_state_for_ai
+    if _latest_state is None:
+        return
+    digest = summarize_changes(_previous_state_for_ai, _latest_state)
+    # ponytail: baseline advances even if the Ollama call below fails/times out,
+    # so a downtime window's deltas are dropped rather than accumulating into an
+    # ever-growing digest once Ollama comes back.
+    _previous_state_for_ai = _latest_state
+    prompt = (
+        "You are a Formula 1 race engineer giving a brief radio call-out. "
+        f"Recent changes: {digest} In 1-2 sentences, call out anything notable, "
+        "or say nothing significant happened if nothing did."
+    )
+    note_text = await call_ollama(prompt, OLLAMA_HOST, OLLAMA_MODEL)
+    if note_text:
+        await ai_broadcaster.publish({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "text": note_text,
+        })
+
+
+async def _ai_notes_loop() -> None:
+    while True:
+        await asyncio.sleep(AI_NOTE_INTERVAL_SECONDS)
+        await _run_ai_note_cycle()
+
+
+@app.on_event("startup")
+async def _start_ai_notes_loop() -> None:
+    asyncio.create_task(_ai_notes_loop())
+
+
 async def _run_replay(states, speed: float) -> None:
     engine = ReplayEngine(states, speed=speed)
     async for state in engine.stream():
-        await broadcaster.publish(state)
+        await _publish_state(state)
 
 
 @app.post("/session/replay", status_code=202)
@@ -77,7 +127,7 @@ class LiveRequest(BaseModel):
 async def _run_live(sse_url: str) -> None:
     adapter = LiveAdapter(sse_url)
     async for state in adapter.stream():
-        await broadcaster.publish(state)
+        await _publish_state(state)
 
 
 @app.post("/session/live", status_code=202)
@@ -110,3 +160,34 @@ async def session_socket(websocket: WebSocket):
         pass
     finally:
         broadcaster.unsubscribe(queue)
+
+
+class ChatRequest(BaseModel):
+    question: str
+
+
+@app.post("/ai/chat")
+async def ai_chat(req: ChatRequest):
+    context = "No session data yet." if _latest_state is None else describe_state(_latest_state)
+    prompt = (
+        "You are a Formula 1 race engineer. Current session context: "
+        f"{context} Question: {req.question} Answer concisely."
+    )
+    answer = await call_ollama(prompt, OLLAMA_HOST, OLLAMA_MODEL)
+    return {"answer": answer or "Unable to reach the AI assistant right now."}
+
+
+@app.websocket("/ws/ai-notes")
+async def ai_notes_socket(websocket: WebSocket):
+    # ponytail: minimal endpoint so this task's own test can observe published
+    # notes; Task 4 owns any richer wiring for this route.
+    await websocket.accept()
+    queue = ai_broadcaster.subscribe()
+    try:
+        while True:
+            note = await queue.get()
+            await websocket.send_json(note)
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        ai_broadcaster.unsubscribe(queue)
