@@ -1,3 +1,5 @@
+import httpx
+
 from app.schema import SessionState, TrackStatus
 
 
@@ -34,3 +36,18 @@ def describe_state(state: SessionState) -> str:
         return "No drivers on track."
     top3 = ", ".join(f"{d.abbreviation} (P{d.position})" for d in state.drivers[:3])
     return f"Track status: {state.track_status.value}. Top 3: {top3}."
+
+
+async def call_ollama(
+    prompt: str, host: str, model: str, transport: httpx.AsyncBaseTransport | None = None
+) -> str | None:
+    try:
+        async with httpx.AsyncClient(transport=transport, timeout=30.0) as client:
+            response = await client.post(
+                f"{host}/api/generate",
+                json={"model": model, "prompt": prompt, "stream": False},
+            )
+            response.raise_for_status()
+            return response.json().get("response")
+    except (httpx.HTTPError, ValueError):
+        return None

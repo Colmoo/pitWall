@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
 
-from app.ai_adapter import summarize_changes, describe_state
+import httpx
+import pytest
+
+from app.ai_adapter import summarize_changes, describe_state, call_ollama
 from app.schema import DriverState, SessionState, Tire, TrackStatus
 
 
@@ -71,3 +74,34 @@ def test_describe_state_summarizes_top_3_and_track_status():
 
 def test_describe_state_handles_no_drivers():
     assert describe_state(_state([])) == "No drivers on track."
+
+
+@pytest.mark.asyncio
+async def test_call_ollama_returns_response_text_on_success():
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/generate"
+        return httpx.Response(200, json={"response": "VER is pulling away in the lead."})
+
+    transport = httpx.MockTransport(handler)
+    result = await call_ollama("some prompt", "http://fake-ollama", "gemma3:4b", transport=transport)
+    assert result == "VER is pulling away in the lead."
+
+
+@pytest.mark.asyncio
+async def test_call_ollama_returns_none_on_http_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="internal error")
+
+    transport = httpx.MockTransport(handler)
+    result = await call_ollama("some prompt", "http://fake-ollama", "gemma3:4b", transport=transport)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_call_ollama_returns_none_on_connection_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused", request=request)
+
+    transport = httpx.MockTransport(handler)
+    result = await call_ollama("some prompt", "http://fake-ollama", "gemma3:4b", transport=transport)
+    assert result is None
