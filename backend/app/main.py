@@ -77,6 +77,9 @@ async def _run_ai_note_cycle() -> None:
     if _latest_state is None:
         return
     digest = summarize_changes(_previous_state_for_ai, _latest_state)
+    # ponytail: baseline advances even if the Ollama call below fails/times out,
+    # so a downtime window's deltas are dropped rather than accumulating into an
+    # ever-growing digest once Ollama comes back.
     _previous_state_for_ai = _latest_state
     prompt = (
         "You are a Formula 1 race engineer giving a brief radio call-out. "
