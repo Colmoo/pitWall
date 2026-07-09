@@ -26,3 +26,27 @@ test("shows track status, leader, and lap from the latest state", () => {
   expect(screen.getByText("VER")).toBeInTheDocument();
   expect(screen.getByText("12")).toBeInTheDocument();
 });
+
+test("replaces every underscore in a multi-word track status and colors it yellow", () => {
+  const state: SessionState = {
+    timestamp: "t1",
+    track_status: "virtual_safety_car",
+    drivers: [],
+  };
+  render(<OverviewPanel state={state} />);
+  const value = screen.getByText("VIRTUAL SAFETY CAR");
+  expect(value).toBeInTheDocument();
+  expect(value.textContent).not.toContain("_");
+  expect(value).toHaveClass("yellow");
+});
+
+test("colors a red flag status red", () => {
+  const state: SessionState = {
+    timestamp: "t1",
+    track_status: "red",
+    drivers: [],
+  };
+  render(<OverviewPanel state={state} />);
+  const value = screen.getByText("RED");
+  expect(value).toHaveClass("red");
+});

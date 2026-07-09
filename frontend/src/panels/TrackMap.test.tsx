@@ -53,3 +53,17 @@ test("shows the circuit name from sessionParams below the map", async () => {
 
   await waitFor(() => expect(screen.getByText("Silverstone")).toBeInTheDocument());
 });
+
+test("keeps the viewBox square for a non-square (wide) track so the bezel ring never clips", async () => {
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ points: [[0, 0], [100, 0], [100, 10], [0, 10]] }),
+  });
+
+  render(<TrackMap state={null} sessionParams={{ year: 2023, event: "Silverstone", sessionType: "R" }} />);
+
+  const outline = await waitFor(() => screen.getByTestId("track-outline"));
+  const svg = outline.closest("svg");
+  const [, , vbWidth, vbHeight] = svg!.getAttribute("viewBox")!.split(" ").map(Number);
+  expect(vbWidth).toBeCloseTo(vbHeight);
+});

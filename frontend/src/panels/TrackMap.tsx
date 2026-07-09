@@ -32,7 +32,11 @@ export function TrackMap({ state, sessionParams }: { state: SessionState | null;
   const maxY = Math.max(...ys);
   const width = maxX - minX || 1;
   const height = maxY - minY || 1;
-  const padding = Math.max(width, height) * 0.05;
+  const size = Math.max(width, height);
+  const padding = size * 0.05;
+  const centerX = minX + width / 2;
+  const centerY = minY + height / 2;
+  const viewSize = size + padding * 2;
 
   const pathD = points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x},${y}`).join(" ") + " Z";
 
@@ -41,13 +45,13 @@ export function TrackMap({ state, sessionParams }: { state: SessionState | null;
   return (
     <>
       <svg
-        viewBox={`${minX - padding} ${minY - padding} ${width + padding * 2} ${height + padding * 2}`}
+        viewBox={`${centerX - viewSize / 2} ${centerY - viewSize / 2} ${viewSize} ${viewSize}`}
         style={{ width: "100%", height: "auto" }}
       >
         <circle
-          cx={minX + width / 2}
-          cy={minY + height / 2}
-          r={Math.max(width, height) / 2 + padding * 0.6}
+          cx={centerX}
+          cy={centerY}
+          r={size / 2 + padding * 0.6}
           fill="none"
           stroke="#1a1d1f"
           strokeWidth={width * 0.003}

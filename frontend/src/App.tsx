@@ -21,7 +21,7 @@ export default function App() {
         <h1>PitWall</h1>
         <ReplayControls onStarted={setSessionParams} />
       </header>
-      <div className="pitwall-grid">
+      <main className="pitwall-grid">
         <div className="pitwall-sidebar-left">
           <OverviewPanel state={latest} />
           <div className="pitwall-panel">
@@ -45,7 +45,7 @@ export default function App() {
             <TrackMap state={latest} sessionParams={sessionParams} />
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

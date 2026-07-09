@@ -2,9 +2,9 @@ import type { SessionState } from "../types";
 
 function statusColorClass(status: SessionState["track_status"] | undefined): string {
   if (status === "green") return "green";
-  if (status === "yellow") return "yellow";
-  if (status === undefined) return "";
-  return "red";
+  if (status === "yellow" || status === "safety_car" || status === "virtual_safety_car") return "yellow";
+  if (status === "red") return "red";
+  return "";
 }
 
 export function OverviewPanel({ state }: { state: SessionState | null }) {
@@ -16,7 +16,7 @@ export function OverviewPanel({ state }: { state: SessionState | null }) {
       <div className="pitwall-stat">
         <div className="pitwall-stat-label">Track Status</div>
         <div className={`pitwall-stat-value ${statusColorClass(state?.track_status)}`}>
-          {state ? state.track_status.replace("_", " ").toUpperCase() : "—"}
+          {state ? state.track_status.replaceAll("_", " ").toUpperCase() : "—"}
         </div>
       </div>
       <div className="pitwall-stat">
