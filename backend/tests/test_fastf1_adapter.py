@@ -164,15 +164,15 @@ def test_attach_weather_picks_nearest_sample_by_elapsed_time():
     laps, session_start = _laps_df()
     states = session_states_from_laps(laps, session_start)
     weather_data = pd.DataFrame([
-        dict(Time=timedelta(seconds=0), AirTemp=22.0, TrackTemp=35.0, Humidity=50.0, WindSpeed=2.0, Rainfall=False),
-        dict(Time=timedelta(minutes=3), AirTemp=23.0, TrackTemp=37.0, Humidity=48.0, WindSpeed=3.0, Rainfall=False),
+        dict(Time=timedelta(seconds=90), AirTemp=22.0, TrackTemp=35.0, Humidity=50.0, WindSpeed=2.0, Rainfall=False),
+        dict(Time=timedelta(seconds=185), AirTemp=23.0, TrackTemp=37.0, Humidity=48.0, WindSpeed=3.0, Rainfall=False),
     ])
 
     attach_weather(states, weather_data, session_start)
 
-    # lap 1 ends at session Time 1:33 (max of VER 1:32 + HAM 1:33) -> closer to the Time=3:00 sample
-    assert states[0].weather.air_temp == 23.0
-    # lap 2 ends at session Time 3:04.5 -> closer to the Time=3:00 sample
+    # lap 1 ends at elapsed 93s (max of VER 92s + HAM 93s) -> distance to 90s is 3, distance to 185s is 92 -> picks 90s sample
+    assert states[0].weather.air_temp == 22.0
+    # lap 2 ends at elapsed 184.5s (max of VER 182s + HAM 184.5s) -> distance to 90s is 94.5, distance to 185s is 0.5 -> picks 185s sample
     assert states[1].weather.air_temp == 23.0
     assert states[1].weather.rainfall is False
 
