@@ -11,6 +11,7 @@ import { useAiNotes } from "./api/useAiNotes";
 import { RaceEngineerNotes } from "./panels/RaceEngineerNotes";
 import { AiChat } from "./panels/AiChat";
 import { SelectedDriverCard } from "./panels/SelectedDriverCard";
+import { GapTrendChart } from "./panels/GapTrendChart";
 
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:8000/ws/session";
 const AI_NOTES_WS_URL = import.meta.env.VITE_BACKEND_AI_NOTES_WS_URL ?? "ws://localhost:8000/ws/ai-notes";
@@ -77,6 +78,10 @@ export default function App() {
           <div className="pitwall-panel">
             <div className="pitwall-panel-title">Sector Times</div>
             <SectorTimes state={latest} />
+          </div>
+          <div className="pitwall-panel">
+            <div className="pitwall-panel-title">Gap Trend (to Leader)</div>
+            <GapTrendChart history={history} selectedDriver={selectedDriver} />
           </div>
         </div>
         <div className="pitwall-sidebar-right">
