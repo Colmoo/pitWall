@@ -10,6 +10,7 @@ import { OverviewPanel } from "./panels/OverviewPanel";
 import { useAiNotes } from "./api/useAiNotes";
 import { RaceEngineerNotes } from "./panels/RaceEngineerNotes";
 import { AiChat } from "./panels/AiChat";
+import { SelectedDriverCard } from "./panels/SelectedDriverCard";
 
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:8000/ws/session";
 const AI_NOTES_WS_URL = import.meta.env.VITE_BACKEND_AI_NOTES_WS_URL ?? "ws://localhost:8000/ws/ai-notes";
@@ -79,6 +80,10 @@ export default function App() {
           </div>
         </div>
         <div className="pitwall-sidebar-right">
+          <div className="pitwall-panel">
+            <div className="pitwall-panel-title">Selected Driver</div>
+            <SelectedDriverCard state={latest} selectedDriver={selectedDriver} />
+          </div>
           <div className="pitwall-panel pitwall-circuit-bezel">
             <div className="pitwall-panel-title">Circuit</div>
             <TrackMap state={latest} sessionParams={sessionParams} />
