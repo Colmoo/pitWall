@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./App.css";
 import { useSessionSocket } from "./api/useSessionSocket";
-import { ReplayControls } from "./controls/ReplayControls";
+import { LandingPage } from "./panels/LandingPage";
 import { TimingTower } from "./panels/TimingTower";
 import { TrackMap } from "./panels/TrackMap";
 import { TireStrategy } from "./panels/TireStrategy";
@@ -15,16 +15,28 @@ const WS_URL = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:8000/ws/se
 const AI_NOTES_WS_URL = import.meta.env.VITE_BACKEND_AI_NOTES_WS_URL ?? "ws://localhost:8000/ws/ai-notes";
 
 export default function App() {
+  const [sessionStarted, setSessionStarted] = useState(false);
   const [sessionParams, setSessionParams] = useState<{ year: number; event: string; sessionType: string } | null>(null);
   const history = useSessionSocket(WS_URL, sessionParams);
   const latest = history.length > 0 ? history[history.length - 1] : null;
   const notes = useAiNotes(AI_NOTES_WS_URL);
 
+  if (!sessionStarted) {
+    return (
+      <LandingPage
+        onReplayStarted={(params) => {
+          setSessionParams(params);
+          setSessionStarted(true);
+        }}
+        onLiveStarted={() => setSessionStarted(true)}
+      />
+    );
+  }
+
   return (
     <div>
       <header className="pitwall-header">
         <h1>PitWall</h1>
-        <ReplayControls onStarted={setSessionParams} />
       </header>
       <main className="pitwall-grid">
         <div className="pitwall-sidebar-left">
