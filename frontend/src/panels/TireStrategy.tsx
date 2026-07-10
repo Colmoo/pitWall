@@ -1,4 +1,5 @@
 import type { SessionState } from "../types";
+import { tireColor } from "../constants";
 
 type Stint = { compound: string; startLap: number; endLap: number };
 
@@ -46,7 +47,13 @@ export function TireStrategy({ history }: { history: SessionState[] }) {
                 <div
                   key={`${stint.compound}-${stint.startLap}`}
                   data-testid={`stint-${driverNumber}-${stint.compound}-${stint.startLap}-${stint.endLap}`}
-                  style={{ padding: "2px 8px", background: "#333", borderRadius: 4 }}
+                  style={{
+                    padding: "2px 8px",
+                    background: tireColor(stint.compound),
+                    color: "#050607",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
                 >
                   {stint.compound} ({stint.startLap}-{stint.endLap})
                 </div>

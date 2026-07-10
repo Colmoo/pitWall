@@ -37,3 +37,10 @@ test("shows a placeholder when there is no history yet", () => {
   render(<TireStrategy history={[]} />);
   expect(screen.getByText(/waiting for session data/i)).toBeInTheDocument();
 });
+
+test("colors each stint segment by tire compound", () => {
+  const history = [driverTick(1, "SOFT"), driverTick(2, "SOFT")];
+  render(<TireStrategy history={history} />);
+  const segment = screen.getByTestId("stint-1-SOFT-1-2");
+  expect(segment).toHaveStyle({ background: "#e10600" });
+});
