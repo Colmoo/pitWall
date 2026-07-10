@@ -237,3 +237,24 @@ def test_telemetry_endpoint_returns_traces(monkeypatch):
     })
     assert resp.status_code == 200
     assert resp.json() == {"distance": [0.0], "speed": [250], "throttle": [100], "brake": [False], "gear": [6], "rpm": [11000]}
+
+
+def test_meta_years_endpoint(monkeypatch):
+    monkeypatch.setattr("app.main.list_supported_years", lambda: [2018, 2019])
+    resp = client.get("/meta/years")
+    assert resp.status_code == 200
+    assert resp.json() == {"years": [2018, 2019]}
+
+
+def test_meta_events_endpoint(monkeypatch):
+    monkeypatch.setattr("app.main.list_events_for_year", lambda **kwargs: ["Bahrain Grand Prix"])
+    resp = client.get("/meta/events", params={"year": 2023})
+    assert resp.status_code == 200
+    assert resp.json() == {"events": ["Bahrain Grand Prix"]}
+
+
+def test_meta_sessions_endpoint(monkeypatch):
+    monkeypatch.setattr("app.main.list_sessions_for_event", lambda **kwargs: ["Practice 1", "Qualifying", "Race"])
+    resp = client.get("/meta/sessions", params={"year": 2023, "event": "Bahrain Grand Prix"})
+    assert resp.status_code == 200
+    assert resp.json() == {"sessions": ["Practice 1", "Qualifying", "Race"]}

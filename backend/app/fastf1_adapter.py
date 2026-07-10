@@ -1,4 +1,5 @@
 from datetime import datetime
+import os
 
 import fastf1
 import pandas as pd
@@ -143,6 +144,43 @@ def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) 
     fastest_lap = session.laps.pick_fastest()
     telemetry = fastest_lap.get_telemetry()
     return track_layout_from_telemetry(telemetry)
+
+
+# ponytail: 2018 is the earliest season FastF1's lap-by-lap timing data is
+# considered reliable; earlier seasons exist in the schedule API but aren't
+# useful for this app's per-lap replay.
+def list_supported_years() -> list[int]:
+    return list(range(2018, datetime.now().year + 1))
+
+
+_schedule_cache: dict[int, "pd.DataFrame"] = {}
+
+
+def _get_schedule(year: int, cache_dir: str) -> "pd.DataFrame":
+    # ponytail: Only cache when cache_dir exists. In test mode with mocked
+    # get_event_schedule, cache_dir is typically /tmp/x (nonexistent), and
+    # bypassing the cache lets each test get its mocked data fresh.
+    if os.path.exists(cache_dir):
+        if year not in _schedule_cache:
+            fastf1.Cache.enable_cache(cache_dir)
+            _schedule_cache[year] = fastf1.get_event_schedule(year, include_testing=False)
+        return _schedule_cache[year]
+    else:
+        return fastf1.get_event_schedule(year, include_testing=False)
+
+
+def list_events_for_year(year: int, cache_dir: str) -> list[str]:
+    schedule = _get_schedule(year, cache_dir).sort_values("RoundNumber")
+    return schedule["EventName"].tolist()
+
+
+def list_sessions_for_event(year: int, event: str, cache_dir: str) -> list[str]:
+    schedule = _get_schedule(year, cache_dir)
+    matches = schedule[schedule["EventName"] == event]
+    if matches.empty:
+        return []
+    row = matches.iloc[0]
+    return [row[col] for col in ("Session1", "Session2", "Session3", "Session4", "Session5") if pd.notna(row[col])]
 
 
 def load_driver_lap_telemetry(

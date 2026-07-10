@@ -9,7 +9,14 @@ from pydantic import BaseModel
 
 from app.ai_adapter import call_ollama, describe_state, summarize_changes
 from app.broadcaster import Broadcaster
-from app.fastf1_adapter import load_driver_lap_telemetry, load_session_states, load_track_layout
+from app.fastf1_adapter import (
+    list_events_for_year,
+    list_sessions_for_event,
+    list_supported_years,
+    load_driver_lap_telemetry,
+    load_session_states,
+    load_track_layout,
+)
 from app.live_adapter import LiveAdapter
 from app.replay import ReplayEngine
 from app.schema import SessionState
@@ -57,6 +64,21 @@ def _start_session_task(coro) -> None:
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/meta/years")
+def meta_years():
+    return {"years": list_supported_years()}
+
+
+@app.get("/meta/events")
+def meta_events(year: int):
+    return {"events": list_events_for_year(year=year, cache_dir=CACHE_DIR)}
+
+
+@app.get("/meta/sessions")
+def meta_sessions(year: int, event: str):
+    return {"sessions": list_sessions_for_event(year=year, event=event, cache_dir=CACHE_DIR)}
 
 
 class ReplayRequest(BaseModel):
