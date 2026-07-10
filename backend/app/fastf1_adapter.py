@@ -1,5 +1,4 @@
 from datetime import datetime
-import os
 
 import fastf1
 import pandas as pd
@@ -157,16 +156,10 @@ _schedule_cache: dict[int, "pd.DataFrame"] = {}
 
 
 def _get_schedule(year: int, cache_dir: str) -> "pd.DataFrame":
-    # ponytail: Only cache when cache_dir exists. In test mode with mocked
-    # get_event_schedule, cache_dir is typically /tmp/x (nonexistent), and
-    # bypassing the cache lets each test get its mocked data fresh.
-    if os.path.exists(cache_dir):
-        if year not in _schedule_cache:
-            fastf1.Cache.enable_cache(cache_dir)
-            _schedule_cache[year] = fastf1.get_event_schedule(year, include_testing=False)
-        return _schedule_cache[year]
-    else:
-        return fastf1.get_event_schedule(year, include_testing=False)
+    if year not in _schedule_cache:
+        fastf1.Cache.enable_cache(cache_dir)
+        _schedule_cache[year] = fastf1.get_event_schedule(year, include_testing=False)
+    return _schedule_cache[year]
 
 
 def list_events_for_year(year: int, cache_dir: str) -> list[str]:

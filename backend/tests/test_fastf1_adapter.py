@@ -273,17 +273,19 @@ def test_list_supported_years_starts_at_2018_and_ends_at_current_year():
     assert years[-1] == datetime.now().year
 
 
-def test_list_events_for_year_returns_event_names_in_round_order(monkeypatch):
+def test_list_events_for_year_returns_event_names_in_round_order(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.fastf1_adapter._schedule_cache", {})
     schedule = pd.DataFrame([
         dict(RoundNumber=2, EventName="Saudi Arabian Grand Prix"),
         dict(RoundNumber=1, EventName="Bahrain Grand Prix"),
     ])
     monkeypatch.setattr("app.fastf1_adapter.fastf1.get_event_schedule", lambda year, include_testing: schedule)
-    events = list_events_for_year(year=2023, cache_dir="/tmp/x")
+    events = list_events_for_year(year=2023, cache_dir=str(tmp_path))
     assert events == ["Bahrain Grand Prix", "Saudi Arabian Grand Prix"]
 
 
-def test_list_sessions_for_event_returns_non_null_session_names_in_order(monkeypatch):
+def test_list_sessions_for_event_returns_non_null_session_names_in_order(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.fastf1_adapter._schedule_cache", {})
     schedule = pd.DataFrame([
         dict(
             RoundNumber=1, EventName="Bahrain Grand Prix",
@@ -298,14 +300,15 @@ def test_list_sessions_for_event_returns_non_null_session_names_in_order(monkeyp
     ])
     monkeypatch.setattr("app.fastf1_adapter.fastf1.get_event_schedule", lambda year, include_testing: schedule)
 
-    bahrain_sessions = list_sessions_for_event(year=2023, event="Bahrain Grand Prix", cache_dir="/tmp/x")
+    bahrain_sessions = list_sessions_for_event(year=2023, event="Bahrain Grand Prix", cache_dir=str(tmp_path))
     assert bahrain_sessions == ["Practice 1", "Practice 2", "Practice 3", "Qualifying", "Race"]
 
-    baku_sessions = list_sessions_for_event(year=2023, event="Azerbaijan Grand Prix", cache_dir="/tmp/x")
+    baku_sessions = list_sessions_for_event(year=2023, event="Azerbaijan Grand Prix", cache_dir=str(tmp_path))
     assert baku_sessions == ["Practice 1", "Qualifying", "Sprint Shootout", "Sprint", "Race"]
 
 
-def test_list_sessions_for_event_returns_empty_for_unknown_event(monkeypatch):
+def test_list_sessions_for_event_returns_empty_for_unknown_event(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.fastf1_adapter._schedule_cache", {})
     schedule = pd.DataFrame([dict(RoundNumber=1, EventName="Bahrain Grand Prix", Session1="Race", Session2=None, Session3=None, Session4=None, Session5=None)])
     monkeypatch.setattr("app.fastf1_adapter.fastf1.get_event_schedule", lambda year, include_testing: schedule)
-    assert list_sessions_for_event(year=2023, event="Nonexistent Grand Prix", cache_dir="/tmp/x") == []
+    assert list_sessions_for_event(year=2023, event="Nonexistent Grand Prix", cache_dir=str(tmp_path)) == []
