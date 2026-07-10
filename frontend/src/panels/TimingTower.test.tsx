@@ -20,6 +20,8 @@ const sampleState: SessionState = {
       lap_number: null, sector_1_time: null, sector_2_time: null, sector_3_time: null,
     },
   ],
+  weather: null,
+  race_control_messages: [],
 };
 
 test("renders drivers sorted by position with tire and lap info", () => {

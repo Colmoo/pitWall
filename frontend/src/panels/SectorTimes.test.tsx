@@ -16,6 +16,8 @@ test("renders one row per driver with sector times", () => {
   const state: SessionState = {
     timestamp: "t1", track_status: "green",
     drivers: [driver("1", "VER", 28.0, 32.0, 31.0), driver("44", "HAM", 28.5, 31.5, 31.2)],
+    weather: null,
+    race_control_messages: [],
   };
   render(<SectorTimes state={state} />);
   expect(screen.getByText("VER")).toBeInTheDocument();
@@ -26,6 +28,8 @@ test("marks the session-best sector time cell", () => {
   const state: SessionState = {
     timestamp: "t1", track_status: "green",
     drivers: [driver("1", "VER", 28.0, 32.0, 31.0), driver("44", "HAM", 27.5, 31.5, 31.2)],
+    weather: null,
+    race_control_messages: [],
   };
   render(<SectorTimes state={state} />);
   expect(screen.getByTestId("sector1-best-44")).toBeInTheDocument();

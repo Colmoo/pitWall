@@ -15,6 +15,8 @@ function driverTick(lap: number, compound: string): SessionState {
         lap_number: lap, sector_1_time: null, sector_2_time: null, sector_3_time: null,
       },
     ],
+    weather: null,
+    race_control_messages: [],
   };
 }
 
