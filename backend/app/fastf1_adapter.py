@@ -145,6 +145,25 @@ def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) 
     return track_layout_from_telemetry(telemetry)
 
 
+def load_driver_lap_telemetry(
+    year: int, event: str, session_type: str, driver: str, lap_number: int, cache_dir: str,
+) -> dict:
+    session = get_or_load_session(year=year, event=event, session_type=session_type, cache_dir=cache_dir)
+    driver_laps = session.laps.pick_drivers(driver).pick_laps(lap_number)
+    if driver_laps.empty:
+        return {"distance": [], "speed": [], "throttle": [], "brake": [], "gear": [], "rpm": []}
+
+    car_data = driver_laps.iloc[0].get_car_data().add_distance()
+    return {
+        "distance": car_data["Distance"].tolist(),
+        "speed": car_data["Speed"].tolist(),
+        "throttle": car_data["Throttle"].tolist(),
+        "brake": car_data["Brake"].tolist(),
+        "gear": car_data["nGear"].tolist(),
+        "rpm": car_data["RPM"].tolist(),
+    }
+
+
 def load_session_states(year: int, event: str, session_type: str, cache_dir: str) -> list[SessionState]:
     session = get_or_load_session(year, event, session_type, cache_dir)
     # ponytail: session.session_start_time is a Timedelta (session-relative), not

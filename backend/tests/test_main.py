@@ -225,3 +225,15 @@ def test_ai_chat_returns_fallback_when_ollama_unavailable(monkeypatch):
     resp = client.post("/ai/chat", json={"question": "Who is leading?"})
     assert resp.status_code == 200
     assert resp.json() == {"answer": "Unable to reach the AI assistant right now."}
+
+
+def test_telemetry_endpoint_returns_traces(monkeypatch):
+    monkeypatch.setattr(
+        "app.main.load_driver_lap_telemetry",
+        lambda **kwargs: {"distance": [0.0], "speed": [250], "throttle": [100], "brake": [False], "gear": [6], "rpm": [11000]},
+    )
+    resp = client.get("/session/telemetry", params={
+        "year": 2023, "event": "British Grand Prix", "session_type": "R", "driver": "1", "lap_number": 5,
+    })
+    assert resp.status_code == 200
+    assert resp.json() == {"distance": [0.0], "speed": [250], "throttle": [100], "brake": [False], "gear": [6], "rpm": [11000]}

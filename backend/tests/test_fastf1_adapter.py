@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app.fastf1_adapter import attach_weather, attach_race_control_messages, session_states_from_laps, track_layout_from_telemetry
+from app.fastf1_adapter import attach_weather, attach_race_control_messages, load_driver_lap_telemetry, session_states_from_laps, track_layout_from_telemetry
 
 
 def _laps_df():
@@ -199,3 +199,69 @@ def test_attach_race_control_messages_only_includes_messages_up_to_timestamp():
     assert states[0].race_control_messages[0].message == "PIT EXIT OPEN"
     assert len(states[1].race_control_messages) == 2
     assert states[1].race_control_messages[1].flag == "YELLOW"
+
+
+def test_load_driver_lap_telemetry_returns_traces(monkeypatch):
+    car_data = pd.DataFrame({
+        "Distance": [0.0, 10.0, 20.0],
+        "Speed": [250, 260, 270],
+        "Throttle": [100, 100, 80],
+        "Brake": [False, False, True],
+        "nGear": [6, 6, 5],
+        "RPM": [11000, 11200, 10800],
+    })
+
+    class FakeLapRow:
+        def get_car_data(self):
+            class Result:
+                def add_distance(self_inner):
+                    return car_data
+            return Result()
+
+    class FakeDriverLaps:
+        empty = False
+        iloc = [FakeLapRow()]
+
+    class FakeLaps:
+        def pick_drivers(self, driver):
+            assert driver == "1"
+            return self
+
+        def pick_laps(self, lap_number):
+            assert lap_number == 5
+            return FakeDriverLaps()
+
+    class FakeSession:
+        laps = FakeLaps()
+
+    monkeypatch.setattr("app.fastf1_adapter.get_or_load_session", lambda **kwargs: FakeSession())
+
+    result = load_driver_lap_telemetry(
+        year=2023, event="British Grand Prix", session_type="R", driver="1", lap_number=5, cache_dir="/tmp/x",
+    )
+    assert result["distance"] == [0.0, 10.0, 20.0]
+    assert result["speed"] == [250, 260, 270]
+    assert result["brake"] == [False, False, True]
+    assert result["gear"] == [6, 6, 5]
+
+
+def test_load_driver_lap_telemetry_returns_empty_when_lap_not_found(monkeypatch):
+    class FakeDriverLaps:
+        empty = True
+
+    class FakeLaps:
+        def pick_drivers(self, driver):
+            return self
+
+        def pick_laps(self, lap_number):
+            return FakeDriverLaps()
+
+    class FakeSession:
+        laps = FakeLaps()
+
+    monkeypatch.setattr("app.fastf1_adapter.get_or_load_session", lambda **kwargs: FakeSession())
+
+    result = load_driver_lap_telemetry(
+        year=2023, event="British Grand Prix", session_type="R", driver="99", lap_number=1, cache_dir="/tmp/x",
+    )
+    assert result == {"distance": [], "speed": [], "throttle": [], "brake": [], "gear": [], "rpm": []}

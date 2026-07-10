@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.ai_adapter import call_ollama, describe_state, summarize_changes
 from app.broadcaster import Broadcaster
-from app.fastf1_adapter import load_session_states, load_track_layout
+from app.fastf1_adapter import load_driver_lap_telemetry, load_session_states, load_track_layout
 from app.live_adapter import LiveAdapter
 from app.replay import ReplayEngine
 from app.schema import SessionState
@@ -142,6 +142,13 @@ async def track_layout(year: int, event: str, session_type: str):
         year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
     )
     return {"points": points}
+
+
+@app.get("/session/telemetry")
+async def session_telemetry(year: int, event: str, session_type: str, driver: str, lap_number: int):
+    return load_driver_lap_telemetry(
+        year=year, event=event, session_type=session_type, driver=driver, lap_number=lap_number, cache_dir=CACHE_DIR,
+    )
 
 
 @app.websocket("/ws/session")
