@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 import { useSessionSocket } from "./api/useSessionSocket";
 import { LandingPage } from "./panels/LandingPage";
@@ -20,6 +20,28 @@ export default function App() {
   const history = useSessionSocket(WS_URL, sessionParams);
   const latest = history.length > 0 ? history[history.length - 1] : null;
   const notes = useAiNotes(AI_NOTES_WS_URL);
+
+  const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedDriver === null && latest && latest.drivers.length > 0) {
+      setSelectedDriver(latest.drivers[0].driver_number);
+    }
+  }, [latest, selectedDriver]);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!latest || latest.drivers.length === 0) return;
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      const sorted = [...latest.drivers].sort((a, b) => a.position - b.position);
+      const currentIndex = sorted.findIndex((d) => d.driver_number === selectedDriver);
+      const delta = e.key === "ArrowDown" ? 1 : -1;
+      const nextIndex = Math.min(Math.max(currentIndex + delta, 0), sorted.length - 1);
+      setSelectedDriver(sorted[nextIndex].driver_number);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [latest, selectedDriver]);
 
   if (!sessionStarted) {
     return (
@@ -49,7 +71,7 @@ export default function App() {
         <div className="pitwall-center">
           <div className="pitwall-panel">
             <div className="pitwall-panel-title">Timing Tower</div>
-            <TimingTower state={latest} />
+            <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />
           </div>
           <div className="pitwall-panel">
             <div className="pitwall-panel-title">Sector Times</div>

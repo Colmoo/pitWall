@@ -1,14 +1,19 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import App from "./App";
 
 class FakeWebSocket {
+  static instances: FakeWebSocket[] = [];
   onmessage: ((ev: { data: string }) => void) | null = null;
   onclose: (() => void) | null = null;
+  constructor() {
+    FakeWebSocket.instances.push(this);
+  }
   close() {}
 }
 
 beforeEach(() => {
+  FakeWebSocket.instances = [];
   // @ts-expect-error test double
   global.WebSocket = FakeWebSocket;
   global.fetch = vi.fn().mockImplementation((url: string) => {
@@ -50,4 +55,34 @@ test("renders Race Engineer Notes and AI Chat panels alongside everything else",
   await startReplay();
   expect(screen.getByText(/no notes yet/i)).toBeInTheDocument();
   expect(screen.getByLabelText(/ask a question/i)).toBeInTheDocument();
+});
+
+function driverState(position: number, driverNumber: string, abbreviation: string) {
+  return {
+    driver_number: driverNumber, abbreviation, team: "Red Bull Racing", position,
+    gap_to_leader: null, gap_to_ahead: null, last_lap_time: null, best_lap_time: null,
+    tire: { compound: "SOFT", age_laps: 1 }, x: null, y: null,
+    lap_number: 1, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+  };
+}
+
+test("auto-selects the race leader once session data arrives and highlights their timing tower row", async () => {
+  await startReplay();
+  const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+  act(() => {
+    socket.onmessage?.({
+      data: JSON.stringify({
+        timestamp: "t1",
+        track_status: "green",
+        weather: null,
+        race_control_messages: [],
+        drivers: [driverState(1, "1", "VER"), driverState(2, "44", "HAM")],
+      }),
+    });
+  });
+
+  await waitFor(() => {
+    const row = screen.getAllByText("VER").map((el) => el.closest("tr.pitwall-row-selectable")).find(Boolean);
+    expect(row).toHaveClass("pitwall-row-selected");
+  });
 });
