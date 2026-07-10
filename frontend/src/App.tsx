@@ -14,6 +14,7 @@ import { SelectedDriverCard } from "./panels/SelectedDriverCard";
 import { GapTrendChart } from "./panels/GapTrendChart";
 import { TelemetryStack } from "./panels/TelemetryStack";
 import { WeatherPanel } from "./panels/WeatherPanel";
+import { RaceControlTicker } from "./panels/RaceControlTicker";
 
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:8000/ws/session";
 const AI_NOTES_WS_URL = import.meta.env.VITE_BACKEND_AI_NOTES_WS_URL ?? "ws://localhost:8000/ws/ai-notes";
@@ -113,6 +114,10 @@ export default function App() {
           </div>
         </div>
       </main>
+      <footer className="pitwall-panel" style={{ margin: "0 8px 8px" }}>
+        <div className="pitwall-panel-title">Race Control</div>
+        <RaceControlTicker state={latest} />
+      </footer>
     </div>
   );
 }
