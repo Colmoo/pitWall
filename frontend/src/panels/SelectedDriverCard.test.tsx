@@ -29,6 +29,7 @@ test("shows the selected driver's stats", () => {
   expect(screen.getByText("HAM")).toBeInTheDocument();
   expect(screen.getByText("MEDIUM (5)")).toBeInTheDocument();
   expect(screen.getByText("+5.200")).toBeInTheDocument();
+  expect(screen.getByText("+3.100")).toBeInTheDocument();
 });
 
 test("shows a placeholder when no driver is selected", () => {
