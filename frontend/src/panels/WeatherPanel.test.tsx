@@ -15,7 +15,7 @@ test("shows air/track temp, humidity, and wind", () => {
   render(<WeatherPanel state={stateWithWeather} />);
   expect(screen.getByText("22.1°C")).toBeInTheDocument();
   expect(screen.getByText("36.2°C")).toBeInTheDocument();
-  expect(screen.getByText("51%")).toBeInTheDocument();
+  expect(screen.getByText("51.0%")).toBeInTheDocument();
   expect(screen.getByText("2.7 km/h")).toBeInTheDocument();
 });
 
