@@ -64,19 +64,22 @@ export default function App() {
     <div>
       <header className="pitwall-header">
         <h1>PitWall</h1>
+        <div className="pitwall-stat-value" style={{ fontSize: 11 }}>
+          {latest ? latest.track_status.replaceAll("_", " ").toUpperCase() : "—"}
+        </div>
       </header>
       <main className="pitwall-grid">
         <div className="pitwall-sidebar-left">
           <OverviewPanel state={latest} />
           <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Tire Strategy</div>
-            <TireStrategy history={history} />
+            <div className="pitwall-panel-title">Timing Tower</div>
+            <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />
           </div>
         </div>
         <div className="pitwall-center">
-          <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Timing Tower</div>
-            <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />
+          <div className="pitwall-panel pitwall-circuit-bezel">
+            <div className="pitwall-panel-title">Circuit</div>
+            <TrackMap state={latest} sessionParams={sessionParams} />
           </div>
           <div className="pitwall-panel">
             <div className="pitwall-panel-title">Sector Times</div>
@@ -87,8 +90,8 @@ export default function App() {
             <GapTrendChart history={history} selectedDriver={selectedDriver} />
           </div>
           <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Telemetry</div>
-            <TelemetryStack sessionParams={sessionParams} state={latest} selectedDriver={selectedDriver} />
+            <div className="pitwall-panel-title">Tire Strategy</div>
+            <TireStrategy history={history} />
           </div>
         </div>
         <div className="pitwall-sidebar-right">
@@ -97,12 +100,12 @@ export default function App() {
             <SelectedDriverCard state={latest} selectedDriver={selectedDriver} />
           </div>
           <div className="pitwall-panel">
+            <div className="pitwall-panel-title">Telemetry</div>
+            <TelemetryStack sessionParams={sessionParams} state={latest} selectedDriver={selectedDriver} />
+          </div>
+          <div className="pitwall-panel">
             <div className="pitwall-panel-title">Weather</div>
             <WeatherPanel state={latest} />
-          </div>
-          <div className="pitwall-panel pitwall-circuit-bezel">
-            <div className="pitwall-panel-title">Circuit</div>
-            <TrackMap state={latest} sessionParams={sessionParams} />
           </div>
           <div className="pitwall-panel">
             <div className="pitwall-panel-title">Race Engineer Notes</div>
