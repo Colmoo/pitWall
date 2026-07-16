@@ -37,6 +37,8 @@ test("plots a dot for each driver with known x/y", async () => {
         lap_number: 1, sector_1_time: null, sector_2_time: null, sector_3_time: null,
       },
     ],
+    weather: null,
+    race_control_messages: [],
   };
 
   render(<TrackMap state={state} sessionParams={{ year: 2023, event: "Silverstone", sessionType: "R" }} />);

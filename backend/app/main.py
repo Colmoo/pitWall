@@ -9,7 +9,14 @@ from pydantic import BaseModel
 
 from app.ai_adapter import call_ollama, describe_state, summarize_changes
 from app.broadcaster import Broadcaster
-from app.fastf1_adapter import load_session_states, load_track_layout
+from app.fastf1_adapter import (
+    list_events_for_year,
+    list_sessions_for_event,
+    list_supported_years,
+    load_driver_lap_telemetry,
+    load_session_states,
+    load_track_layout,
+)
 from app.live_adapter import LiveAdapter
 from app.replay import ReplayEngine
 from app.schema import SessionState
@@ -59,6 +66,21 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/meta/years")
+def meta_years():
+    return {"years": list_supported_years()}
+
+
+@app.get("/meta/events")
+def meta_events(year: int):
+    return {"events": list_events_for_year(year=year, cache_dir=CACHE_DIR)}
+
+
+@app.get("/meta/sessions")
+def meta_sessions(year: int, event: str):
+    return {"sessions": list_sessions_for_event(year=year, event=event, cache_dir=CACHE_DIR)}
+
+
 class ReplayRequest(BaseModel):
     year: int
     event: str
@@ -81,6 +103,8 @@ async def _run_ai_note_cycle() -> None:
     # so a downtime window's deltas are dropped rather than accumulating into an
     # ever-growing digest once Ollama comes back.
     _previous_state_for_ai = _latest_state
+    if digest == "No significant changes since last check.":
+        return
     prompt = (
         "You are a Formula 1 race engineer giving a brief radio call-out. "
         f"Recent changes: {digest} In 1-2 sentences, call out anything notable, "
@@ -142,6 +166,13 @@ async def track_layout(year: int, event: str, session_type: str):
         year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
     )
     return {"points": points}
+
+
+@app.get("/session/telemetry")
+async def session_telemetry(year: int, event: str, session_type: str, driver: str, lap_number: int):
+    return load_driver_lap_telemetry(
+        year=year, event=event, session_type=session_type, driver=driver, lap_number=lap_number, cache_dir=CACHE_DIR,
+    )
 
 
 @app.websocket("/ws/session")

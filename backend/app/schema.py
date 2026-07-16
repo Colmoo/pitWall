@@ -17,6 +17,21 @@ class Tire(BaseModel):
     age_laps: int
 
 
+class WeatherSnapshot(BaseModel):
+    air_temp: float
+    track_temp: float
+    humidity: float
+    wind_speed: float
+    rainfall: bool
+
+
+class RaceControlMessage(BaseModel):
+    timestamp: datetime
+    category: str
+    message: str
+    flag: str | None = None
+
+
 class DriverState(BaseModel):
     driver_number: str
     abbreviation: str
@@ -39,3 +54,5 @@ class SessionState(BaseModel):
     timestamp: datetime
     track_status: TrackStatus
     drivers: list[DriverState]
+    weather: WeatherSnapshot | None = None
+    race_control_messages: list[RaceControlMessage] = []

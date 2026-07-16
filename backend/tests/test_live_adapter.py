@@ -41,6 +41,7 @@ def _tree(**overrides):
             }
         },
         "TrackStatus": {"Status": "1", "Message": "AllClear"},
+        "RaceControlMessages": {"Messages": {}},
     }
     base.update(overrides)
     return base
@@ -93,6 +94,24 @@ def test_session_state_from_live_tree_defaults_unknown_track_status_to_green():
 def test_session_state_from_live_tree_returns_none_when_data_incomplete():
     assert session_state_from_live_tree({"Heartbeat": {"Utc": "now"}}, datetime.now(timezone.utc)) is None
     assert session_state_from_live_tree({"DriverList": {"1": {"Tla": "VER"}}}, datetime.now(timezone.utc)) is None
+
+
+def test_session_state_from_live_tree_parses_race_control_messages():
+    tree = _tree(RaceControlMessages={
+        "Messages": {
+            "0": {"Utc": "2026-07-09T13:05:09", "Category": "Other", "Message": "PIT EXIT OPEN"},
+            "1": {"Utc": "2026-07-09T13:10:01", "Category": "Flag", "Message": "GREEN LIGHT", "Flag": "GREEN"},
+        }
+    })
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    assert len(state.race_control_messages) == 2
+    assert state.race_control_messages[0].message == "PIT EXIT OPEN"
+    assert state.race_control_messages[1].flag == "GREEN"
+
+
+def test_session_state_from_live_tree_defaults_race_control_messages_to_empty():
+    state = session_state_from_live_tree(_tree(), datetime.now(timezone.utc))
+    assert state.race_control_messages == []
 
 
 @pytest.mark.asyncio

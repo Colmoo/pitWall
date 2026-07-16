@@ -15,6 +15,8 @@ function driverTick(lap: number, compound: string): SessionState {
         lap_number: lap, sector_1_time: null, sector_2_time: null, sector_3_time: null,
       },
     ],
+    weather: null,
+    race_control_messages: [],
   };
 }
 
@@ -34,4 +36,11 @@ test("splits into multiple stints on a compound change", () => {
 test("shows a placeholder when there is no history yet", () => {
   render(<TireStrategy history={[]} />);
   expect(screen.getByText(/waiting for session data/i)).toBeInTheDocument();
+});
+
+test("colors each stint segment by tire compound", () => {
+  const history = [driverTick(1, "SOFT"), driverTick(2, "SOFT")];
+  render(<TireStrategy history={history} />);
+  const segment = screen.getByTestId("stint-1-SOFT-1-2");
+  expect(segment).toHaveStyle({ background: "#e10600" });
 });

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import httpx
 
 from app.live_merge import merge_patch
-from app.schema import DriverState, SessionState, Tire, TrackStatus
+from app.schema import DriverState, RaceControlMessage, SessionState, Tire, TrackStatus
 from app.sse_parser import parse_sse_events
 
 # ponytail: these field names and status codes are best-effort, based on F1's
@@ -54,6 +54,32 @@ def _parse_sector(sectors: list, index: int) -> float | None:
         return float(value)
     except (ValueError, TypeError):
         return None
+
+
+# ponytail: field names here follow the same publicly-documented live-timing
+# schema assumed elsewhere in this file (see _TRACK_STATUS_CODES) - not yet
+# verified against a real live SSE stream, adjust if a field name is wrong.
+def _parse_race_control_messages(tree: dict) -> list[RaceControlMessage]:
+    entries = tree.get("RaceControlMessages", {}).get("Messages", {})
+    messages: list[RaceControlMessage] = []
+    for entry in entries.values():
+        utc = entry.get("Utc")
+        if not utc:
+            continue
+        try:
+            timestamp = datetime.fromisoformat(utc.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        messages.append(
+            RaceControlMessage(
+                timestamp=timestamp,
+                category=entry.get("Category", ""),
+                message=entry.get("Message", ""),
+                flag=entry.get("Flag"),
+            )
+        )
+    messages.sort(key=lambda m: m.timestamp)
+    return messages
 
 
 def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionState | None:
@@ -108,6 +134,7 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
         timestamp=timestamp,
         track_status=track_status,
         drivers=sorted(drivers, key=lambda d: d.position),
+        race_control_messages=_parse_race_control_messages(tree),
     )
 
 

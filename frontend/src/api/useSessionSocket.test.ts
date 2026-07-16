@@ -12,7 +12,7 @@ class FakeWebSocket {
 }
 
 function sampleState(timestamp: string) {
-  return { timestamp, track_status: "green", drivers: [] };
+  return { timestamp, track_status: "green", drivers: [], weather: null, race_control_messages: [] };
 }
 
 test("returns an empty history before any message arrives", () => {

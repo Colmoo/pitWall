@@ -1,0 +1,40 @@
+import { render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom";
+import { GapTrendChart } from "./GapTrendChart";
+import type { SessionState } from "../types";
+
+function stateWithGap(lap: number, gap: number | null): SessionState {
+  return {
+    timestamp: `t${lap}`,
+    track_status: "green",
+    weather: null,
+    race_control_messages: [],
+    drivers: [
+      {
+        driver_number: "44", abbreviation: "HAM", team: "Mercedes", position: 2,
+        gap_to_leader: gap, gap_to_ahead: gap, last_lap_time: 90, best_lap_time: 90,
+        tire: { compound: "MEDIUM", age_laps: lap }, x: null, y: null,
+        lap_number: lap, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+      },
+    ],
+  };
+}
+
+test("draws a line for the selected driver's gap history", () => {
+  const history = [stateWithGap(1, 2.0), stateWithGap(2, 2.5), stateWithGap(3, 1.8)];
+  render(<GapTrendChart history={history} selectedDriver="44" />);
+  expect(screen.getByTestId("gap-trend-line")).toBeInTheDocument();
+});
+
+test("shows a placeholder when no driver is selected", () => {
+  render(<GapTrendChart history={[]} selectedDriver={null} />);
+  expect(screen.getByText(/select a driver/i)).toBeInTheDocument();
+});
+
+test("skips ticks where the gap is unknown", () => {
+  const history = [stateWithGap(1, 2.0), stateWithGap(2, null), stateWithGap(3, 1.8)];
+  render(<GapTrendChart history={history} selectedDriver="44" />);
+  const line = screen.getByTestId("gap-trend-line");
+  // 2 known points -> polyline has exactly 2 coordinate pairs
+  expect(line.getAttribute("points")?.trim().split(" ")).toHaveLength(2);
+});

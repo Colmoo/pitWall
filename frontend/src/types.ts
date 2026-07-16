@@ -5,6 +5,21 @@ export interface Tire {
   age_laps: number;
 }
 
+export interface WeatherSnapshot {
+  air_temp: number;
+  track_temp: number;
+  humidity: number;
+  wind_speed: number;
+  rainfall: boolean;
+}
+
+export interface RaceControlMessage {
+  timestamp: string;
+  category: string;
+  message: string;
+  flag: string | null;
+}
+
 export interface DriverState {
   driver_number: string;
   abbreviation: string;
@@ -27,6 +42,8 @@ export interface SessionState {
   timestamp: string;
   track_status: TrackStatus;
   drivers: DriverState[];
+  weather: WeatherSnapshot | null;
+  race_control_messages: RaceControlMessage[];
 }
 
 export interface AiNote {
