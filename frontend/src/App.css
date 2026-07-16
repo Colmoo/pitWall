@@ -42,6 +42,21 @@ body {
   text-transform: uppercase;
 }
 
+.pitwall-home-button {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 5px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pitwall-home-button:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
 .pitwall-grid {
   display: grid;
   grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(320px, 380px);
@@ -99,6 +114,22 @@ body {
   letter-spacing: 1.5px;
   text-transform: uppercase;
   margin-bottom: 6px;
+}
+
+.pitwall-drag-handle {
+  cursor: grab;
+  user-select: none;
+}
+
+.pitwall-drag-handle:active {
+  cursor: grabbing;
+  color: var(--cyan);
+}
+
+.pitwall-sidebar-left,
+.pitwall-sidebar-right {
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
 }
 
 .pitwall-circuit-bezel {

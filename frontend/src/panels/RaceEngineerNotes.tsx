@@ -6,7 +6,7 @@ export function RaceEngineerNotes({ notes }: { notes: AiNote[] }) {
   }
   const newestFirst = [...notes].reverse();
   return (
-    <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+    <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 220, overflowY: "auto" }}>
       {newestFirst.map((note) => (
         <li key={note.timestamp} style={{ marginBottom: 6, fontSize: 12 }}>
           {note.text}

@@ -107,6 +107,21 @@ def attach_weather(states: list[SessionState], weather_data: pd.DataFrame, sessi
         state.weather = nearest_weather_sample(weather_data, elapsed)
 
 
+def attach_car_positions(
+    states: list[SessionState], pos_data: dict[str, "pd.DataFrame"], session_start: datetime
+) -> None:
+    for state in states:
+        elapsed = state.timestamp - session_start
+        for driver in state.drivers:
+            driver_pos = pos_data.get(driver.driver_number)
+            if driver_pos is None or driver_pos.empty:
+                continue
+            idx = (driver_pos["Time"] - elapsed).abs().idxmin()
+            row = driver_pos.loc[idx]
+            driver.x = float(row["X"])
+            driver.y = float(row["Y"])
+
+
 def race_control_messages_up_to(rcm: pd.DataFrame, timestamp: datetime) -> list[RaceControlMessage]:
     subset = rcm[rcm["Time"] <= timestamp]
     return [
@@ -141,7 +156,12 @@ def get_or_load_session(year: int, event: str, session_type: str, cache_dir: str
 def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) -> list[list[float]]:
     session = get_or_load_session(year, event, session_type, cache_dir)
     fastest_lap = session.laps.pick_fastest()
-    telemetry = fastest_lap.get_telemetry()
+    try:
+        telemetry = fastest_lap.get_telemetry()
+    except KeyError:
+        # Some older/incomplete sessions (e.g. 2018 Australian GP) have no car
+        # position telemetry at all - degrade to an empty layout rather than 500.
+        return []
     return track_layout_from_telemetry(telemetry)
 
 
@@ -204,4 +224,5 @@ def load_session_states(year: int, event: str, session_type: str, cache_dir: str
     states = session_states_from_laps(session.laps, session_start)
     attach_weather(states, session.weather_data, session_start)
     attach_race_control_messages(states, session.race_control_messages)
+    attach_car_positions(states, session.pos_data, session_start)
     return states

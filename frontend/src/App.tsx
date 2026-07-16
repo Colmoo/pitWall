@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import { Panel } from "./panels/Panel";
 import { useSessionSocket } from "./api/useSessionSocket";
 import { LandingPage } from "./panels/LandingPage";
 import { TimingTower } from "./panels/TimingTower";
@@ -60,10 +61,19 @@ export default function App() {
     );
   }
 
+  function goHome() {
+    setSessionStarted(false);
+    setSessionParams(null);
+    setSelectedDriver(null);
+  }
+
   return (
     <div>
       <header className="pitwall-header">
         <h1>PitWall</h1>
+        <button type="button" className="pitwall-home-button" onClick={goHome}>
+          ← Home
+        </button>
         <div className="pitwall-stat-value" style={{ fontSize: 11 }}>
           {latest ? latest.track_status.replaceAll("_", " ").toUpperCase() : "—"}
         </div>
@@ -71,50 +81,40 @@ export default function App() {
       <main className="pitwall-grid">
         <div className="pitwall-sidebar-left">
           <OverviewPanel state={latest} />
-          <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Timing Tower</div>
+          <Panel id="timing-tower" title="Timing Tower">
             <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />
-          </div>
+          </Panel>
         </div>
         <div className="pitwall-center">
-          <div className="pitwall-panel pitwall-circuit-bezel">
-            <div className="pitwall-panel-title">Circuit</div>
+          <Panel id="circuit" title="Circuit" className="pitwall-circuit-bezel">
             <TrackMap state={latest} sessionParams={sessionParams} />
-          </div>
-          <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Sector Times</div>
+          </Panel>
+          <Panel id="sector-times" title="Sector Times">
             <SectorTimes state={latest} />
-          </div>
-          <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Gap Trend (to Leader)</div>
+          </Panel>
+          <Panel id="gap-trend" title="Gap Trend (to Leader)">
             <GapTrendChart history={history} selectedDriver={selectedDriver} />
-          </div>
-          <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Tire Strategy</div>
+          </Panel>
+          <Panel id="tire-strategy" title="Tire Strategy">
             <TireStrategy history={history} />
-          </div>
+          </Panel>
         </div>
         <div className="pitwall-sidebar-right">
-          <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Selected Driver</div>
+          <Panel id="selected-driver" title="Selected Driver">
             <SelectedDriverCard state={latest} selectedDriver={selectedDriver} />
-          </div>
-          <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Telemetry</div>
+          </Panel>
+          <Panel id="telemetry" title="Telemetry">
             <TelemetryStack sessionParams={sessionParams} state={latest} selectedDriver={selectedDriver} />
-          </div>
-          <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Weather</div>
+          </Panel>
+          <Panel id="weather" title="Weather">
             <WeatherPanel state={latest} />
-          </div>
-          <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Race Engineer Notes</div>
+          </Panel>
+          <Panel id="race-engineer-notes" title="Race Engineer Notes">
             <RaceEngineerNotes notes={notes} />
-          </div>
-          <div className="pitwall-panel">
-            <div className="pitwall-panel-title">Ask The Engineer</div>
+          </Panel>
+          <Panel id="ai-chat" title="Ask The Engineer">
             <AiChat />
-          </div>
+          </Panel>
         </div>
       </main>
       <footer className="pitwall-panel" style={{ margin: "0 8px 8px" }}>

@@ -23,7 +23,7 @@ export function AiChat() {
 
   return (
     <div>
-      <div>
+      <div style={{ maxHeight: 220, overflowY: "auto" }}>
         {exchanges.map((exchange, i) => (
           <div key={i} style={{ marginBottom: 8, fontSize: 12 }}>
             <div style={{ color: "#6b7280" }}>{exchange.question}</div>

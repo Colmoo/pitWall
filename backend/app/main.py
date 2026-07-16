@@ -103,6 +103,8 @@ async def _run_ai_note_cycle() -> None:
     # so a downtime window's deltas are dropped rather than accumulating into an
     # ever-growing digest once Ollama comes back.
     _previous_state_for_ai = _latest_state
+    if digest == "No significant changes since last check.":
+        return
     prompt = (
         "You are a Formula 1 race engineer giving a brief radio call-out. "
         f"Recent changes: {digest} In 1-2 sentences, call out anything notable, "
