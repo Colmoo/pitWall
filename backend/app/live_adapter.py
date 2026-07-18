@@ -62,7 +62,7 @@ def _parse_sector(sectors: list, index: int) -> float | None:
 def _parse_race_control_messages(tree: dict) -> list[RaceControlMessage]:
     entries = tree.get("RaceControlMessages", {}).get("Messages", {})
     messages: list[RaceControlMessage] = []
-    for entry in entries.values():
+    for entry in entries.values() if isinstance(entries, dict) else entries:
         utc = entry.get("Utc")
         if not utc:
             continue

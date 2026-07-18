@@ -109,6 +109,17 @@ def test_session_state_from_live_tree_parses_race_control_messages():
     assert state.race_control_messages[1].flag == "GREEN"
 
 
+def test_session_state_from_live_tree_parses_race_control_messages_as_list():
+    tree = _tree(RaceControlMessages={
+        "Messages": [
+            {"Utc": "2026-07-09T13:05:09", "Category": "Other", "Message": "PIT EXIT OPEN"},
+        ]
+    })
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    assert len(state.race_control_messages) == 1
+    assert state.race_control_messages[0].message == "PIT EXIT OPEN"
+
+
 def test_session_state_from_live_tree_defaults_race_control_messages_to_empty():
     state = session_state_from_live_tree(_tree(), datetime.now(timezone.utc))
     assert state.race_control_messages == []
