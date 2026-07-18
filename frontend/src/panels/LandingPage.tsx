@@ -123,7 +123,7 @@ export function LandingPage({
       <button type="button" onClick={handleGoLive} disabled={loading}>
         {isLoadingLive ? "Loading..." : "Go live"}
       </button>
-      {isLoadingReplay && <p>First load of a session can take a minute or two while race data downloads.</p>}
+      {loading && <p>First load of a session can take a minute or two while race data downloads.</p>}
     </div>
   );
 }

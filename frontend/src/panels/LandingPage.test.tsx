@@ -113,6 +113,7 @@ test("disables the go live button and shows a loading message while it starts", 
   fireEvent.click(screen.getByRole("button", { name: /go live/i }));
 
   await waitFor(() => expect(screen.getByRole("button", { name: /loading/i })).toBeDisabled());
+  expect(screen.getByText(/first load of a session can take a minute or two/i)).toBeInTheDocument();
 
   resolveLive(undefined);
 });
