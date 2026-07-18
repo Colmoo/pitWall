@@ -1,11 +1,6 @@
-import { useEffect, useState } from "react";
 import type { SessionState } from "../types";
-
-const API_URL = import.meta.env.VITE_BACKEND_API_URL ?? "http://localhost:8000";
-
-type Traces = { distance: number[]; speed: number[]; throttle: number[]; brake: boolean[]; gear: number[]; rpm: number[] };
-
-type SessionParams = { year: number; event: string; sessionType: string } | null;
+import { useDriverLapTelemetry } from "../api/useDriverLapTelemetry";
+import type { TelemetrySessionParams } from "../api/useDriverLapTelemetry";
 
 function Trace({ testId, values, max, color }: { testId: string; values: number[]; max: number; color: string }) {
   const width = 100;
@@ -26,24 +21,13 @@ export function TelemetryStack({
   state,
   selectedDriver,
 }: {
-  sessionParams: SessionParams;
+  sessionParams: TelemetrySessionParams;
   state: SessionState | null;
   selectedDriver: string | null;
 }) {
-  const [traces, setTraces] = useState<Traces | null>(null);
   const driver = state?.drivers.find((d) => d.driver_number === selectedDriver) ?? null;
   const lapNumber = driver?.lap_number ?? null;
-
-  useEffect(() => {
-    setTraces(null);
-    if (!sessionParams || !selectedDriver || !lapNumber) return;
-    const url =
-      `${API_URL}/session/telemetry?year=${sessionParams.year}&event=${encodeURIComponent(sessionParams.event)}` +
-      `&session_type=${sessionParams.sessionType}&driver=${selectedDriver}&lap_number=${lapNumber}`;
-    fetch(url)
-      .then((res) => res.json())
-      .then((data: Traces) => setTraces(data));
-  }, [sessionParams, selectedDriver, lapNumber]);
+  const traces = useDriverLapTelemetry(sessionParams, selectedDriver, lapNumber);
 
   if (!sessionParams) {
     return <p>Telemetry unavailable in live mode.</p>;
