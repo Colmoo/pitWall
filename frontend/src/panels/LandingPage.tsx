@@ -40,8 +40,13 @@ export function LandingPage({
       .then((data: { sessions: string[] }) => setSessions(data.sessions));
   }, [year, event]);
 
+  const [isLoadingReplay, setIsLoadingReplay] = useState(false);
+  const [isLoadingLive, setIsLoadingLive] = useState(false);
+  const loading = isLoadingReplay || isLoadingLive;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setIsLoadingReplay(true);
     const parsedYear = Number(year);
     const response = await fetch(`${API_URL}/session/replay`, {
       method: "POST",
@@ -50,10 +55,14 @@ export function LandingPage({
     });
     if (response.ok) {
       onReplayStarted({ year: parsedYear, event, sessionType });
+      setIsLoadingReplay(false);
+      return;
     }
+    setIsLoadingReplay(false);
   }
 
   async function handleGoLive() {
+    setIsLoadingLive(true);
     const response = await fetch(`${API_URL}/session/live`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -61,7 +70,10 @@ export function LandingPage({
     });
     if (response.ok) {
       onLiveStarted();
+      setIsLoadingLive(false);
+      return;
     }
+    setIsLoadingLive(false);
   }
 
   return (
@@ -69,7 +81,7 @@ export function LandingPage({
       <h1>PitWall</h1>
       <form onSubmit={handleSubmit}>
         <label htmlFor="landing-year">Year</label>
-        <select id="landing-year" value={year} onChange={(e) => setYear(e.target.value)}>
+        <select id="landing-year" value={year} onChange={(e) => setYear(e.target.value)} disabled={loading}>
           <option value="" disabled>
             Select year
           </option>
@@ -81,7 +93,7 @@ export function LandingPage({
         </select>
 
         <label htmlFor="landing-track">Track</label>
-        <select id="landing-track" value={event} onChange={(e) => setEvent(e.target.value)} disabled={!year}>
+        <select id="landing-track" value={event} onChange={(e) => setEvent(e.target.value)} disabled={!year || loading}>
           <option value="" disabled>
             Select track
           </option>
@@ -93,7 +105,7 @@ export function LandingPage({
         </select>
 
         <label htmlFor="landing-session">Session</label>
-        <select id="landing-session" value={sessionType} onChange={(e) => setSessionType(e.target.value)} disabled={!event}>
+        <select id="landing-session" value={sessionType} onChange={(e) => setSessionType(e.target.value)} disabled={!event || loading}>
           <option value="" disabled>
             Select session
           </option>
@@ -104,13 +116,14 @@ export function LandingPage({
           ))}
         </select>
 
-        <button type="submit" disabled={!year || !event || !sessionType}>
-          Start replay
+        <button type="submit" disabled={!year || !event || !sessionType || loading}>
+          {isLoadingReplay ? "Loading..." : "Start replay"}
         </button>
       </form>
-      <button type="button" onClick={handleGoLive}>
-        Go live
+      <button type="button" onClick={handleGoLive} disabled={loading}>
+        {isLoadingLive ? "Loading..." : "Go live"}
       </button>
+      {isLoadingReplay && <p>First load of a session can take a minute or two while race data downloads.</p>}
     </div>
   );
 }
