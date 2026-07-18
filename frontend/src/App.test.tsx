@@ -48,7 +48,7 @@ test("renders all panels simultaneously after starting a replay session", async 
   await startReplay();
   // TimingTower, TireStrategy, and SectorTimes each show their own "waiting" message at once
   expect(screen.getAllByText(/waiting for session data/i).length).toBeGreaterThanOrEqual(3);
-  expect(screen.getByText(/overview/i)).toBeInTheDocument();
+  expect(screen.getAllByText(/overview/i).length).toBeGreaterThanOrEqual(1);
 });
 
 test("renders Race Engineer Notes and AI Chat panels alongside everything else", async () => {

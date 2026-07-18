@@ -16,6 +16,22 @@ import { GapTrendChart } from "./panels/GapTrendChart";
 import { TelemetryStack } from "./panels/TelemetryStack";
 import { WeatherPanel } from "./panels/WeatherPanel";
 import { RaceControlTicker } from "./panels/RaceControlTicker";
+import { WidgetGrid } from "./panels/WidgetGrid";
+import type { WidgetLayoutItem } from "./panels/WidgetGrid";
+
+const DASHBOARD_DEFAULT_LAYOUT: WidgetLayoutItem[] = [
+  { i: "overview", x: 0, y: 0, w: 3, h: 6 },
+  { i: "timing-tower", x: 0, y: 6, w: 3, h: 10 },
+  { i: "circuit", x: 3, y: 0, w: 6, h: 10 },
+  { i: "sector-times", x: 3, y: 10, w: 6, h: 6 },
+  { i: "gap-trend", x: 3, y: 16, w: 6, h: 8 },
+  { i: "tire-strategy", x: 3, y: 24, w: 6, h: 8 },
+  { i: "selected-driver", x: 9, y: 0, w: 3, h: 6 },
+  { i: "telemetry", x: 9, y: 6, w: 3, h: 10 },
+  { i: "weather", x: 9, y: 16, w: 3, h: 6 },
+  { i: "race-engineer-notes", x: 9, y: 22, w: 3, h: 6 },
+  { i: "ai-chat", x: 9, y: 28, w: 3, h: 8 },
+];
 
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:8000/ws/session";
 const AI_NOTES_WS_URL = import.meta.env.VITE_BACKEND_AI_NOTES_WS_URL ?? "ws://localhost:8000/ws/ai-notes";
@@ -78,44 +94,42 @@ export default function App() {
           {latest ? latest.track_status.replaceAll("_", " ").toUpperCase() : "—"}
         </div>
       </header>
-      <main className="pitwall-grid">
-        <div className="pitwall-sidebar-left">
-          <OverviewPanel state={latest} />
-          <Panel id="timing-tower" title="Timing Tower">
+      <main>
+        <WidgetGrid storageKey="pitwall-dashboard-layout" defaultLayout={DASHBOARD_DEFAULT_LAYOUT}>
+          <Panel key="overview" id="overview" title="Overview">
+            <OverviewPanel state={latest} />
+          </Panel>
+          <Panel key="timing-tower" id="timing-tower" title="Timing Tower">
             <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />
           </Panel>
-        </div>
-        <div className="pitwall-center">
-          <Panel id="circuit" title="Circuit" className="pitwall-circuit-bezel">
+          <Panel key="circuit" id="circuit" title="Circuit" className="pitwall-circuit-bezel">
             <TrackMap state={latest} sessionParams={sessionParams} />
           </Panel>
-          <Panel id="sector-times" title="Sector Times">
+          <Panel key="sector-times" id="sector-times" title="Sector Times">
             <SectorTimes state={latest} />
           </Panel>
-          <Panel id="gap-trend" title="Gap Trend (to Leader)">
+          <Panel key="gap-trend" id="gap-trend" title="Gap Trend (to Leader)">
             <GapTrendChart history={history} selectedDriver={selectedDriver} />
           </Panel>
-          <Panel id="tire-strategy" title="Tire Strategy">
+          <Panel key="tire-strategy" id="tire-strategy" title="Tire Strategy">
             <TireStrategy history={history} />
           </Panel>
-        </div>
-        <div className="pitwall-sidebar-right">
-          <Panel id="selected-driver" title="Selected Driver">
+          <Panel key="selected-driver" id="selected-driver" title="Selected Driver">
             <SelectedDriverCard state={latest} selectedDriver={selectedDriver} />
           </Panel>
-          <Panel id="telemetry" title="Telemetry">
+          <Panel key="telemetry" id="telemetry" title="Telemetry">
             <TelemetryStack sessionParams={sessionParams} state={latest} selectedDriver={selectedDriver} />
           </Panel>
-          <Panel id="weather" title="Weather">
+          <Panel key="weather" id="weather" title="Weather">
             <WeatherPanel state={latest} />
           </Panel>
-          <Panel id="race-engineer-notes" title="Race Engineer Notes">
+          <Panel key="race-engineer-notes" id="race-engineer-notes" title="Race Engineer Notes">
             <RaceEngineerNotes notes={notes} />
           </Panel>
-          <Panel id="ai-chat" title="Ask The Engineer">
+          <Panel key="ai-chat" id="ai-chat" title="Ask The Engineer">
             <AiChat />
           </Panel>
-        </div>
+        </WidgetGrid>
       </main>
       <footer className="pitwall-panel" style={{ margin: "0 8px 8px" }}>
         <div className="pitwall-panel-title">Race Control</div>
