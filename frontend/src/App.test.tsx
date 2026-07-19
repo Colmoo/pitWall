@@ -23,6 +23,18 @@ beforeEach(() => {
     if (url.includes("/session/replay")) return Promise.resolve({ ok: true, json: async () => ({ status: "started", states: 0 }) });
     if (url.includes("/session/live")) return Promise.resolve({ ok: true, json: async () => ({ status: "started" }) });
     if (url.includes("/session/track-layout")) return Promise.resolve({ ok: true, json: async () => ({ points: [] }) });
+    if (url.includes("/session/telemetry"))
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          distance: [0, 100, 200],
+          speed: [0, 50, 100],
+          throttle: [0, 50, 100],
+          brake: [false, false, true],
+          gear: [0, 1, 2],
+          rpm: [0, 2000, 4000],
+        }),
+      });
     return Promise.resolve({ ok: true, json: async () => ({}) });
   });
 });
@@ -96,4 +108,26 @@ test("auto-selects the race leader once session data arrives and highlights thei
     const row = screen.getAllByText("VER").map((el) => el.closest("tr.pitwall-row-selectable")).find(Boolean);
     expect(row).toHaveClass("pitwall-row-selected");
   });
+});
+
+test("telemetry tab lets you add a driver comparison selection", async () => {
+  await startReplay();
+  const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+  act(() => {
+    socket.onmessage?.({
+      data: JSON.stringify({
+        timestamp: "t1",
+        track_status: "green",
+        weather: null,
+        race_control_messages: [],
+        drivers: [driverState(1, "1", "VER"), driverState(2, "44", "HAM")],
+      }),
+    });
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: /^telemetry$/i }));
+  await waitFor(() => expect(screen.getAllByText("VER").length).toBeGreaterThan(0));
+
+  fireEvent.click(screen.getAllByText("VER")[0]);
+  await waitFor(() => expect(screen.getByText(/VER.*lap 1/i)).toBeInTheDocument());
 });

@@ -18,6 +18,7 @@ import { WeatherPanel } from "./panels/WeatherPanel";
 import { RaceControlTicker } from "./panels/RaceControlTicker";
 import { WidgetGrid } from "./panels/WidgetGrid";
 import type { WidgetLayoutItem } from "./panels/WidgetGrid";
+import { TelemetryTab } from "./panels/TelemetryTab";
 
 const DASHBOARD_DEFAULT_LAYOUT: WidgetLayoutItem[] = [
   { i: "overview", x: 0, y: 0, w: 3, h: 6 },
@@ -152,7 +153,7 @@ export default function App() {
       )}
       {activeTab === "telemetry" && (
         <main>
-          <p>Telemetry tab placeholder — replaced in Task 8.</p>
+          <TelemetryTab sessionParams={sessionParams} state={latest} />
         </main>
       )}
       <footer className="pitwall-panel" style={{ margin: "0 8px 8px" }}>

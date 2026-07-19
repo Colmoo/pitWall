@@ -77,7 +77,7 @@ export function TelemetryTab({
   }, []);
 
   function addSelection(driverNumber: string, abbreviation: string) {
-    const driver = state?.drivers.find((d) => d.driver_number === driverNumber);
+    const driver = state?.drivers?.find((d) => d.driver_number === driverNumber);
     const id = `${driverNumber}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     setSelections((prev) => [
       ...prev,
@@ -98,8 +98,8 @@ export function TelemetryTab({
     setSelections((prev) => prev.map((s) => (s.id === id ? { ...s, lapNumber } : s)));
   }
 
-  if (!sessionParams) {
-    return <p>Telemetry unavailable in live mode.</p>;
+  if (!sessionParams || !state) {
+    return <p>Waiting for session data…</p>;
   }
 
   const speedMax = Math.max(1, ...selections.flatMap((s) => tracesById[s.id]?.speed ?? []));
