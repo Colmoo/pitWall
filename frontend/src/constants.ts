@@ -33,3 +33,9 @@ const TIRE_COLORS: Record<string, string> = {
 export function tireColor(compound: string): string {
   return TIRE_COLORS[compound.toUpperCase()] ?? "#6b7280";
 }
+
+const COMPARISON_COLORS = ["#3ecbff", "#facc15", "#4ade80", "#f87171", "#a78bfa", "#fb923c"];
+
+export function comparisonColor(index: number): string {
+  return COMPARISON_COLORS[index % COMPARISON_COLORS.length];
+}

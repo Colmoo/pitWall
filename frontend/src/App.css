@@ -256,3 +256,44 @@ tr.pitwall-row-selectable {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.pitwall-driver-picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pitwall-driver-picker button {
+  width: 100%;
+  text-align: left;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.pitwall-comparison-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.pitwall-comparison-row label {
+  display: none;
+}
+
+.pitwall-comparison-row input[type="number"] {
+  width: 48px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 2px 4px;
+}
