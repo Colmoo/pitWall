@@ -44,6 +44,7 @@ export default function App() {
   const notes = useAiNotes(AI_NOTES_WS_URL);
 
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "telemetry">("dashboard");
 
   useEffect(() => {
     if (selectedDriver === null && latest && latest.drivers.length > 0) {
@@ -90,47 +91,70 @@ export default function App() {
         <button type="button" className="pitwall-home-button" onClick={goHome}>
           ← Home
         </button>
+        <nav className="pitwall-tab-bar">
+          <button
+            type="button"
+            className={activeTab === "dashboard" ? "pitwall-tab pitwall-tab-active" : "pitwall-tab"}
+            onClick={() => setActiveTab("dashboard")}
+          >
+            Dashboard
+          </button>
+          <button
+            type="button"
+            className={activeTab === "telemetry" ? "pitwall-tab pitwall-tab-active" : "pitwall-tab"}
+            onClick={() => setActiveTab("telemetry")}
+          >
+            Telemetry
+          </button>
+        </nav>
         <div className="pitwall-stat-value" style={{ fontSize: 11 }}>
           {latest ? latest.track_status.replaceAll("_", " ").toUpperCase() : "—"}
         </div>
       </header>
-      <main>
-        <WidgetGrid storageKey="pitwall-dashboard-layout" defaultLayout={DASHBOARD_DEFAULT_LAYOUT}>
-          <Panel key="overview" id="overview" title="Overview">
-            <OverviewPanel state={latest} />
-          </Panel>
-          <Panel key="timing-tower" id="timing-tower" title="Timing Tower">
-            <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />
-          </Panel>
-          <Panel key="circuit" id="circuit" title="Circuit" className="pitwall-circuit-bezel">
-            <TrackMap state={latest} sessionParams={sessionParams} />
-          </Panel>
-          <Panel key="sector-times" id="sector-times" title="Sector Times">
-            <SectorTimes state={latest} />
-          </Panel>
-          <Panel key="gap-trend" id="gap-trend" title="Gap Trend (to Leader)">
-            <GapTrendChart history={history} selectedDriver={selectedDriver} />
-          </Panel>
-          <Panel key="tire-strategy" id="tire-strategy" title="Tire Strategy">
-            <TireStrategy history={history} />
-          </Panel>
-          <Panel key="selected-driver" id="selected-driver" title="Selected Driver">
-            <SelectedDriverCard state={latest} selectedDriver={selectedDriver} />
-          </Panel>
-          <Panel key="telemetry" id="telemetry" title="Telemetry">
-            <TelemetryStack sessionParams={sessionParams} state={latest} selectedDriver={selectedDriver} />
-          </Panel>
-          <Panel key="weather" id="weather" title="Weather">
-            <WeatherPanel state={latest} />
-          </Panel>
-          <Panel key="race-engineer-notes" id="race-engineer-notes" title="Race Engineer Notes">
-            <RaceEngineerNotes notes={notes} />
-          </Panel>
-          <Panel key="ai-chat" id="ai-chat" title="Ask The Engineer">
-            <AiChat />
-          </Panel>
-        </WidgetGrid>
-      </main>
+      {activeTab === "dashboard" && (
+        <main>
+          <WidgetGrid storageKey="pitwall-dashboard-layout" defaultLayout={DASHBOARD_DEFAULT_LAYOUT}>
+            <Panel key="overview" id="overview" title="Overview">
+              <OverviewPanel state={latest} />
+            </Panel>
+            <Panel key="timing-tower" id="timing-tower" title="Timing Tower">
+              <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />
+            </Panel>
+            <Panel key="circuit" id="circuit" title="Circuit" className="pitwall-circuit-bezel">
+              <TrackMap state={latest} sessionParams={sessionParams} />
+            </Panel>
+            <Panel key="sector-times" id="sector-times" title="Sector Times">
+              <SectorTimes state={latest} />
+            </Panel>
+            <Panel key="gap-trend" id="gap-trend" title="Gap Trend (to Leader)">
+              <GapTrendChart history={history} selectedDriver={selectedDriver} />
+            </Panel>
+            <Panel key="tire-strategy" id="tire-strategy" title="Tire Strategy">
+              <TireStrategy history={history} />
+            </Panel>
+            <Panel key="selected-driver" id="selected-driver" title="Selected Driver">
+              <SelectedDriverCard state={latest} selectedDriver={selectedDriver} />
+            </Panel>
+            <Panel key="telemetry" id="telemetry" title="Telemetry">
+              <TelemetryStack sessionParams={sessionParams} state={latest} selectedDriver={selectedDriver} />
+            </Panel>
+            <Panel key="weather" id="weather" title="Weather">
+              <WeatherPanel state={latest} />
+            </Panel>
+            <Panel key="race-engineer-notes" id="race-engineer-notes" title="Race Engineer Notes">
+              <RaceEngineerNotes notes={notes} />
+            </Panel>
+            <Panel key="ai-chat" id="ai-chat" title="Ask The Engineer">
+              <AiChat />
+            </Panel>
+          </WidgetGrid>
+        </main>
+      )}
+      {activeTab === "telemetry" && (
+        <main>
+          <p>Telemetry tab placeholder — replaced in Task 8.</p>
+        </main>
+      )}
       <footer className="pitwall-panel" style={{ margin: "0 8px 8px" }}>
         <div className="pitwall-panel-title">Race Control</div>
         <RaceControlTicker state={latest} />

@@ -57,6 +57,26 @@ body {
   color: var(--cyan);
 }
 
+.pitwall-tab-bar {
+  display: flex;
+  gap: 4px;
+}
+
+.pitwall-tab {
+  background: transparent;
+  color: var(--label);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 5px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pitwall-tab-active {
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+
 .pitwall-widget-grid {
   position: relative;
   margin: 8px;

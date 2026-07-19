@@ -57,6 +57,17 @@ test("renders Race Engineer Notes and AI Chat panels alongside everything else",
   expect(screen.getByLabelText(/ask a question/i)).toBeInTheDocument();
 });
 
+test("switches to the telemetry tab and back without losing dashboard state", async () => {
+  await startReplay();
+  expect(screen.getByText(/overview/i)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /^telemetry$/i }));
+  expect(screen.queryByText(/overview/i)).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /^dashboard$/i }));
+  expect(screen.getByText(/overview/i)).toBeInTheDocument();
+});
+
 function driverState(position: number, driverNumber: string, abbreviation: string) {
   return {
     driver_number: driverNumber, abbreviation, team: "Red Bull Racing", position,
