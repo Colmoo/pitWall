@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SessionState } from "../types";
 import { comparisonColor } from "../constants";
 import { useDriverLapTelemetry } from "../api/useDriverLapTelemetry";
@@ -25,7 +25,9 @@ function TelemetryFetcher({
   onData: (id: string, traces: Traces | null) => void;
 }) {
   const traces = useDriverLapTelemetry(sessionParams, selection.driver, selection.lapNumber);
-  onData(selection.id, traces);
+  useEffect(() => {
+    onData(selection.id, traces);
+  }, [selection.id, traces, onData]);
   return null;
 }
 
