@@ -24,8 +24,8 @@ export function WidgetGrid({
     }
   });
 
-  function handleLayoutChange(next: WidgetLayoutItem[]) {
-    setLayout(next);
+  function handleLayoutChange(next: readonly WidgetLayoutItem[]) {
+    setLayout([...next]);
     localStorage.setItem(storageKey, JSON.stringify(next));
   }
 
