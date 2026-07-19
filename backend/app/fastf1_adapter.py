@@ -14,61 +14,67 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
     states: list[SessionState] = []
     best_lap_by_driver: dict[str, float] = {}
 
-    for lap_number, group in laps.groupby("LapNumber"):
-        lap_time_at_end = group["Time"].max()
-        timestamp = session_start + lap_time_at_end
+    # running: driver_number -> (latest DriverState, its row Time). Rebuilt into
+    # a fresh snapshot on every lap-completion event so state doesn't drift once
+    # emitted - see model_copy() below.
+    running: dict[str, tuple[DriverState, "pd.Timedelta"]] = {}
 
-        # entries pairs each built DriverState with its raw cumulative session
-        # Time, so gaps can be computed after sorting by classification order.
-        entries: list[tuple[DriverState, "pd.Timedelta"]] = []
-        for _, row in group.iterrows():
-            # Real FastF1 data has NaN/NaT for out-laps, in-laps, red-flag laps,
-            # and unclassified/retired drivers. Skip rows we can't build a usable
-            # snapshot entry from, rather than crashing or fabricating values.
-            if pd.isna(row["LapTime"]) or pd.isna(row["Position"]):
-                continue
-
-            last_lap_seconds = row["LapTime"].total_seconds()
-            number = str(row["DriverNumber"])
-            best_so_far = best_lap_by_driver.get(number)
-            if best_so_far is None or last_lap_seconds < best_so_far:
-                best_so_far = last_lap_seconds
-            best_lap_by_driver[number] = best_so_far
-
-            age_laps = 0 if pd.isna(row["TyreLife"]) else int(row["TyreLife"])
-
-            driver_state = DriverState(
-                driver_number=number,
-                abbreviation=row["Driver"],
-                team=row["Team"],
-                position=int(row["Position"]),
-                gap_to_leader=None,
-                gap_to_ahead=None,
-                last_lap_time=last_lap_seconds,
-                best_lap_time=best_so_far,
-                tire=Tire(compound=row["Compound"], age_laps=age_laps),
-                lap_number=int(lap_number),
-                sector_1_time=_sector_seconds(row["Sector1Time"]),
-                sector_2_time=_sector_seconds(row["Sector2Time"]),
-                sector_3_time=_sector_seconds(row["Sector3Time"]),
-            )
-            entries.append((driver_state, row["Time"]))
-
-        if not entries:
+    # Sort by Time (session-relative cumulative clock), not LapNumber - LapNumber
+    # is a per-driver counter and bundling rows that share a count across drivers
+    # mixes up unrelated, non-simultaneous timing events (see bug report).
+    for _, row in laps.sort_values("Time").iterrows():
+        # Real FastF1 data has NaN/NaT for out-laps, in-laps, red-flag laps,
+        # and unclassified/retired drivers. Skip rows we can't build a usable
+        # snapshot entry from, rather than crashing or fabricating values.
+        if pd.isna(row["LapTime"]) or pd.isna(row["Position"]):
             continue
 
+        last_lap_seconds = row["LapTime"].total_seconds()
+        number = str(row["DriverNumber"])
+        best_so_far = best_lap_by_driver.get(number)
+        if best_so_far is None or last_lap_seconds < best_so_far:
+            best_so_far = last_lap_seconds
+        best_lap_by_driver[number] = best_so_far
+
+        age_laps = 0 if pd.isna(row["TyreLife"]) else int(row["TyreLife"])
+        flying_lap = pd.isna(row["PitOutTime"]) and pd.isna(row["PitInTime"])
+
+        driver_state = DriverState(
+            driver_number=number,
+            abbreviation=row["Driver"],
+            team=row["Team"],
+            position=int(row["Position"]),
+            gap_to_leader=None,
+            gap_to_ahead=None,
+            last_lap_time=last_lap_seconds,
+            best_lap_time=best_so_far,
+            tire=Tire(compound=row["Compound"], age_laps=age_laps),
+            lap_number=int(row["LapNumber"]),
+            sector_1_time=_sector_seconds(row["Sector1Time"]),
+            sector_2_time=_sector_seconds(row["Sector2Time"]),
+            sector_3_time=_sector_seconds(row["Sector3Time"]),
+            flying_lap=bool(flying_lap),
+        )
+        running[number] = (driver_state, row["Time"])
+
+        # entries pairs a *copy* of each currently-known driver's state with its
+        # raw cumulative session Time, so gaps can be computed for this snapshot
+        # without mutating objects already emitted into earlier states.
+        entries: list[tuple[DriverState, "pd.Timedelta"]] = [
+            (state.model_copy(), row_time) for state, row_time in running.values()
+        ]
         entries.sort(key=lambda pair: pair[0].position)
         leader_time = entries[0][1]
         previous_time = None
-        for driver_state, row_time in entries:
-            is_leader = driver_state is entries[0][0]
-            driver_state.gap_to_leader = None if is_leader else (row_time - leader_time).total_seconds()
-            driver_state.gap_to_ahead = None if previous_time is None else (row_time - previous_time).total_seconds()
+        for entry_state, row_time in entries:
+            is_leader = entry_state is entries[0][0]
+            entry_state.gap_to_leader = None if is_leader else (row_time - leader_time).total_seconds()
+            entry_state.gap_to_ahead = None if previous_time is None else (row_time - previous_time).total_seconds()
             previous_time = row_time
 
         states.append(
             SessionState(
-                timestamp=timestamp,
+                timestamp=session_start + row["Time"],
                 # ponytail: track status omitted in replay v1, defaults to green.
                 track_status=TrackStatus.GREEN,
                 drivers=[pair[0] for pair in entries],
@@ -224,5 +230,11 @@ def load_session_states(year: int, event: str, session_type: str, cache_dir: str
     states = session_states_from_laps(session.laps, session_start)
     attach_weather(states, session.weather_data, session_start)
     attach_race_control_messages(states, session.race_control_messages)
-    attach_car_positions(states, session.pos_data, session_start)
+    try:
+        pos_data = session.pos_data
+    except fastf1.core.DataNotLoadedError:
+        # Some sessions (e.g. older/incomplete ones) have no car position
+        # telemetry at all - degrade to no positions rather than 500.
+        pos_data = {}
+    attach_car_positions(states, pos_data, session_start)
     return states

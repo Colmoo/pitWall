@@ -8,12 +8,14 @@ const sampleState: SessionState = {
   track_status: "green",
   weather: null,
   race_control_messages: [],
+  team_radio: [],
   drivers: [
     {
       driver_number: "1", abbreviation: "VER", team: "Red Bull Racing", position: 1,
       gap_to_leader: null, gap_to_ahead: null, last_lap_time: 90, best_lap_time: 90,
       tire: { compound: "SOFT", age_laps: 3 }, x: null, y: null,
       lap_number: 5, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+    micro_sectors: [], flying_lap: null, speed: null, throttle: null, brake: null, gear: null, rpm: null, drs: null,
     },
   ],
 };

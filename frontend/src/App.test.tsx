@@ -86,6 +86,7 @@ function driverState(position: number, driverNumber: string, abbreviation: strin
     gap_to_leader: null, gap_to_ahead: null, last_lap_time: null, best_lap_time: null,
     tire: { compound: "SOFT", age_laps: 1 }, x: null, y: null,
     lap_number: 1, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+  micro_sectors: [], flying_lap: null, speed: null, throttle: null, brake: null, gear: null, rpm: null, drs: null,
   };
 }
 

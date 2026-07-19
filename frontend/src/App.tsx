@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import "./App.css";
+import type { SessionState } from "./types";
 import { Panel } from "./panels/Panel";
 import { useSessionSocket } from "./api/useSessionSocket";
 import { LandingPage } from "./panels/LandingPage";
@@ -19,20 +20,31 @@ import { RaceControlTicker } from "./panels/RaceControlTicker";
 import { WidgetGrid } from "./panels/WidgetGrid";
 import type { WidgetLayoutItem } from "./panels/WidgetGrid";
 import { TelemetryTab } from "./panels/TelemetryTab";
+import { TeamRadioPanel } from "./panels/TeamRadioPanel";
 
+// ponytail: fixed heuristic heights tuned by eye per panel's typical content density,
+// not a true content-driven autosize. Upgrade path: measure content and size dynamically.
 const DASHBOARD_DEFAULT_LAYOUT: WidgetLayoutItem[] = [
-  { i: "overview", x: 0, y: 0, w: 3, h: 6 },
-  { i: "timing-tower", x: 0, y: 6, w: 3, h: 10 },
+  { i: "overview", x: 0, y: 0, w: 3, h: 4 },
+  { i: "timing-tower", x: 0, y: 4, w: 3, h: 10 },
   { i: "circuit", x: 3, y: 0, w: 6, h: 10 },
-  { i: "sector-times", x: 3, y: 10, w: 6, h: 6 },
-  { i: "gap-trend", x: 3, y: 16, w: 6, h: 8 },
-  { i: "tire-strategy", x: 3, y: 24, w: 6, h: 8 },
-  { i: "selected-driver", x: 9, y: 0, w: 3, h: 6 },
-  { i: "telemetry", x: 9, y: 6, w: 3, h: 10 },
-  { i: "weather", x: 9, y: 16, w: 3, h: 6 },
-  { i: "race-engineer-notes", x: 9, y: 22, w: 3, h: 6 },
-  { i: "ai-chat", x: 9, y: 28, w: 3, h: 8 },
+  { i: "sector-times", x: 3, y: 10, w: 6, h: 8 },
+  { i: "gap-trend", x: 3, y: 18, w: 6, h: 8 },
+  { i: "tire-strategy", x: 3, y: 26, w: 6, h: 8 },
+  { i: "selected-driver", x: 9, y: 0, w: 3, h: 8 },
+  { i: "telemetry", x: 9, y: 8, w: 3, h: 10 },
+  { i: "weather", x: 9, y: 18, w: 3, h: 5 },
+  { i: "team-radio", x: 9, y: 23, w: 3, h: 5 },
+  { i: "race-engineer-notes", x: 9, y: 28, w: 3, h: 6 },
+  { i: "ai-chat", x: 9, y: 34, w: 3, h: 8 },
 ];
+
+function trackStatusColorClass(status: SessionState["track_status"] | undefined): string {
+  if (status === "green") return "pitwall-flag-green";
+  if (status === "yellow" || status === "safety_car" || status === "virtual_safety_car") return "pitwall-flag-yellow";
+  if (status === "red") return "pitwall-flag-red";
+  return "";
+}
 
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:8000/ws/session";
 const AI_NOTES_WS_URL = import.meta.env.VITE_BACKEND_AI_NOTES_WS_URL ?? "ws://localhost:8000/ws/ai-notes";
@@ -108,7 +120,7 @@ export default function App() {
             Telemetry
           </button>
         </nav>
-        <div className="pitwall-stat-value" style={{ fontSize: 11 }}>
+        <div className={`pitwall-flag-badge ${trackStatusColorClass(latest?.track_status)}`}>
           {latest ? latest.track_status.replaceAll("_", " ").toUpperCase() : "—"}
         </div>
       </header>
@@ -141,6 +153,9 @@ export default function App() {
             </Panel>
             <Panel key="weather" id="weather" title="Weather">
               <WeatherPanel state={latest} />
+            </Panel>
+            <Panel key="team-radio" id="team-radio" title="Team Radio">
+              <TeamRadioPanel state={latest} />
             </Panel>
             <Panel key="race-engineer-notes" id="race-engineer-notes" title="Race Engineer Notes">
               <RaceEngineerNotes notes={notes} />

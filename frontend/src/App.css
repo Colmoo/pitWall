@@ -77,6 +77,22 @@ body {
   border-color: var(--cyan);
 }
 
+.pitwall-flag-badge {
+  margin-left: auto;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 5px 12px;
+  border-radius: 3px;
+  background: var(--border);
+  color: var(--text);
+}
+
+.pitwall-flag-badge.pitwall-flag-green { background: var(--green); color: #052e13; }
+.pitwall-flag-badge.pitwall-flag-yellow { background: var(--yellow); color: #3a2e00; }
+.pitwall-flag-badge.pitwall-flag-red { background: var(--red); color: #3a0505; }
+
 .pitwall-widget-grid {
   position: relative;
   margin: 8px;
@@ -125,6 +141,25 @@ body {
 .pitwall-circuit-bezel svg {
   width: 100%;
   height: auto;
+}
+
+.pitwall-reset-view-button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  background: var(--panel);
+  color: var(--label);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 3px 8px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.pitwall-reset-view-button:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
 }
 
 .pitwall-circuit-name {
@@ -193,6 +228,48 @@ tr.pitwall-row-selected td {
 }
 
 tr.pitwall-row-selectable {
+  cursor: pointer;
+}
+
+.pitwall-micro-sectors {
+  display: inline-flex;
+  gap: 1px;
+}
+
+.pitwall-micro-sector {
+  display: inline-block;
+  width: 4px;
+  height: 10px;
+  background: var(--border);
+}
+
+.pitwall-micro-sector.purple { background: var(--purple); }
+.pitwall-micro-sector.green { background: var(--green); }
+.pitwall-micro-sector.yellow { background: var(--yellow); }
+.pitwall-micro-sector.gray { background: var(--border); }
+
+.pitwall-lap-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+
+.pitwall-lap-badge.push { background: var(--green); color: #052e13; }
+.pitwall-lap-badge.inout { background: var(--border); color: var(--label); }
+
+.pitwall-fastest-lap-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--label);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
   cursor: pointer;
 }
 
@@ -275,6 +352,34 @@ tr.pitwall-row-selectable {
   border-radius: 2px;
   padding: 4px 8px;
   cursor: pointer;
+}
+
+.pitwall-radio-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pitwall-radio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pitwall-radio-driver {
+  color: var(--cyan);
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 40px;
+}
+
+.pitwall-radio-row audio {
+  flex: 1;
+  height: 28px;
 }
 
 .pitwall-comparison-row {

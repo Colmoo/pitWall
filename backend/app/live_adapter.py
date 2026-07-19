@@ -5,8 +5,31 @@ from datetime import datetime, timezone
 import httpx
 
 from app.live_merge import merge_patch
-from app.schema import DriverState, RaceControlMessage, SessionState, Tire, TrackStatus
+from app.schema import DriverState, RaceControlMessage, SessionState, TeamRadioClip, Tire, TrackStatus, WeatherSnapshot
 from app.sse_parser import parse_sse_events
+
+TEAM_RADIO_BASE_URL = "https://livetiming.formula1.com/static/"
+
+# ponytail: mini-sector "Segments[].Status" codes below are best-effort, based
+# on the same publicly reverse-engineered live-timing schema as
+# _TRACK_STATUS_CODES - not yet verified against a real live SSE stream.
+# Unknown/未-seen codes fall back to "none" rather than guessing.
+_SEGMENT_STATUS_CODES = {
+    2048: "none",
+    2049: "yellow",
+    2051: "green",
+    2052: "purple",
+}
+
+# ponytail: CarData channel numbers below follow the same publicly documented
+# convention (0=RPM, 2=Speed, 3=nGear, 4=Throttle, 5=Brake, 45=DRS) used across
+# other F1 live-timing tooling - not yet verified against a real live stream.
+_CAR_CHANNEL_RPM = "0"
+_CAR_CHANNEL_SPEED = "2"
+_CAR_CHANNEL_GEAR = "3"
+_CAR_CHANNEL_THROTTLE = "4"
+_CAR_CHANNEL_BRAKE = "5"
+_CAR_CHANNEL_DRS = "45"
 
 # ponytail: these field names and status codes are best-effort, based on F1's
 # publicly documented live-timing feed schema (the same one fastf1.livetiming
@@ -82,6 +105,82 @@ def _parse_race_control_messages(tree: dict) -> list[RaceControlMessage]:
     return messages
 
 
+def _parse_micro_sectors(sectors: list) -> list[str]:
+    segments: list[str] = []
+    for sector in sectors:
+        for segment in sector.get("Segments", []) if isinstance(sector, dict) else []:
+            code = segment.get("Status") if isinstance(segment, dict) else None
+            segments.append(_SEGMENT_STATUS_CODES.get(code, "none"))
+    return segments
+
+
+def _parse_flying_lap(timing: dict) -> bool | None:
+    # ponytail: TimingData doesn't expose out/in-lap directly; PitOut/InPit are
+    # the closest signal the live feed gives us for "not currently pushing".
+    if timing.get("PitOut") or timing.get("InPit"):
+        return False
+    if timing.get("Position"):
+        return True
+    return None
+
+
+def _latest_position_entries(tree: dict) -> dict:
+    snapshots = tree.get("Position")
+    if not isinstance(snapshots, list) or not snapshots:
+        return {}
+    latest = snapshots[-1]
+    return latest.get("Entries", {}) if isinstance(latest, dict) else {}
+
+
+def _latest_car_data_entries(tree: dict) -> dict:
+    snapshots = tree.get("CarData")
+    if not isinstance(snapshots, list) or not snapshots:
+        return {}
+    latest = snapshots[-1]
+    return latest.get("Entries", {}) if isinstance(latest, dict) else {}
+
+
+def _parse_weather(tree: dict) -> WeatherSnapshot | None:
+    weather = tree.get("WeatherData")
+    if not isinstance(weather, dict) or not weather:
+        return None
+    try:
+        return WeatherSnapshot(
+            air_temp=float(weather.get("AirTemp", 0)),
+            track_temp=float(weather.get("TrackTemp", 0)),
+            humidity=float(weather.get("Humidity", 0)),
+            wind_speed=float(weather.get("WindSpeed", 0)),
+            rainfall=bool(int(weather.get("Rainfall", 0))),
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_team_radio(tree: dict) -> list[TeamRadioClip]:
+    captures = tree.get("TeamRadio", {}).get("Captures", {})
+    entries = captures.values() if isinstance(captures, dict) else captures
+    session_path = tree.get("SessionInfo", {}).get("Path", "")
+    clips: list[TeamRadioClip] = []
+    for entry in entries:
+        utc = entry.get("Utc")
+        path = entry.get("Path")
+        if not utc or not path:
+            continue
+        try:
+            timestamp = datetime.fromisoformat(utc.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        clips.append(
+            TeamRadioClip(
+                timestamp=timestamp,
+                driver_number=str(entry.get("RacingNumber", "")),
+                url=f"{TEAM_RADIO_BASE_URL}{session_path}{path}",
+            )
+        )
+    clips.sort(key=lambda c: c.timestamp)
+    return clips
+
+
 def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionState | None:
     driver_list = tree.get("DriverList")
     timing_lines = tree.get("TimingData", {}).get("Lines")
@@ -89,6 +188,8 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
         return None
 
     app_data_lines = tree.get("TimingAppData", {}).get("Lines", {})
+    position_entries = _latest_position_entries(tree)
+    car_data_entries = _latest_car_data_entries(tree)
 
     drivers: list[DriverState] = []
     for number, timing in timing_lines.items():
@@ -102,6 +203,10 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
         sectors = timing.get("Sectors", [])
         stints = app_data_lines.get(number, {}).get("Stints", [])
         latest_stint = stints[-1] if stints else {}
+
+        pos_entry = position_entries.get(number, {})
+        channels = car_data_entries.get(number, {}).get("Channels", {})
+        drs_value = channels.get(_CAR_CHANNEL_DRS)
 
         drivers.append(
             DriverState(
@@ -121,6 +226,16 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
                 sector_1_time=_parse_sector(sectors, 0),
                 sector_2_time=_parse_sector(sectors, 1),
                 sector_3_time=_parse_sector(sectors, 2),
+                micro_sectors=_parse_micro_sectors(sectors),
+                flying_lap=_parse_flying_lap(timing),
+                x=pos_entry.get("X"),
+                y=pos_entry.get("Y"),
+                speed=channels.get(_CAR_CHANNEL_SPEED),
+                throttle=channels.get(_CAR_CHANNEL_THROTTLE),
+                brake=bool(channels.get(_CAR_CHANNEL_BRAKE)) if _CAR_CHANNEL_BRAKE in channels else None,
+                gear=channels.get(_CAR_CHANNEL_GEAR),
+                rpm=channels.get(_CAR_CHANNEL_RPM),
+                drs=bool(drs_value) if drs_value is not None else None,
             )
         )
 
@@ -134,7 +249,9 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
         timestamp=timestamp,
         track_status=track_status,
         drivers=sorted(drivers, key=lambda d: d.position),
+        weather=_parse_weather(tree),
         race_control_messages=_parse_race_control_messages(tree),
+        team_radio=_parse_team_radio(tree),
     )
 
 

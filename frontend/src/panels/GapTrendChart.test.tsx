@@ -9,12 +9,14 @@ function stateWithGap(lap: number, gap: number | null): SessionState {
     track_status: "green",
     weather: null,
     race_control_messages: [],
+    team_radio: [],
     drivers: [
       {
         driver_number: "44", abbreviation: "HAM", team: "Mercedes", position: 2,
         gap_to_leader: gap, gap_to_ahead: gap, last_lap_time: 90, best_lap_time: 90,
         tire: { compound: "MEDIUM", age_laps: lap }, x: null, y: null,
         lap_number: lap, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+      micro_sectors: [], flying_lap: null, speed: null, throttle: null, brake: null, gear: null, rpm: null, drs: null,
       },
     ],
   };

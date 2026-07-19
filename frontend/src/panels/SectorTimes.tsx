@@ -14,6 +14,13 @@ function bestDriverNumber(
   return best?.driverNumber ?? null;
 }
 
+function microSectorClass(status: string): string {
+  if (status === "purple") return "purple";
+  if (status === "green") return "green";
+  if (status === "yellow") return "yellow";
+  return "gray";
+}
+
 export function SectorTimes({ state }: { state: SessionState | null }) {
   if (!state) {
     return <p>Waiting for session data...</p>;
@@ -26,7 +33,7 @@ export function SectorTimes({ state }: { state: SessionState | null }) {
   return (
     <table>
       <thead>
-        <tr><th>Driver</th><th>S1</th><th>S2</th><th>S3</th></tr>
+        <tr><th>Driver</th><th>S1</th><th>S2</th><th>S3</th><th>Mini Sectors</th></tr>
       </thead>
       <tbody>
         {state.drivers.map((d) => (
@@ -49,6 +56,13 @@ export function SectorTimes({ state }: { state: SessionState | null }) {
               style={d.driver_number === bestS3 ? { color: "purple" } : undefined}
             >
               {d.sector_3_time?.toFixed(3) ?? "-"}
+            </td>
+            <td>
+              <span className="pitwall-micro-sectors" data-testid={`micro-sectors-${d.driver_number}`}>
+                {d.micro_sectors.map((s, i) => (
+                  <span key={i} className={`pitwall-micro-sector ${microSectorClass(s)}`} />
+                ))}
+              </span>
             </td>
           </tr>
         ))}

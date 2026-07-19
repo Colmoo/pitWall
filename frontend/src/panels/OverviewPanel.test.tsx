@@ -18,10 +18,12 @@ test("shows track status, leader, and lap from the latest state", () => {
         gap_to_leader: null, gap_to_ahead: null, last_lap_time: null, best_lap_time: null,
         tire: { compound: "SOFT", age_laps: 1 }, x: null, y: null,
         lap_number: 12, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+      micro_sectors: [], flying_lap: null, speed: null, throttle: null, brake: null, gear: null, rpm: null, drs: null,
       },
     ],
     weather: null,
     race_control_messages: [],
+  team_radio: [],
   };
   render(<OverviewPanel state={state} />);
   expect(screen.getByText("YELLOW")).toBeInTheDocument();
@@ -36,6 +38,7 @@ test("replaces every underscore in a multi-word track status and colors it yello
     drivers: [],
     weather: null,
     race_control_messages: [],
+  team_radio: [],
   };
   render(<OverviewPanel state={state} />);
   const value = screen.getByText("VIRTUAL SAFETY CAR");
@@ -51,6 +54,7 @@ test("colors a red flag status red", () => {
     drivers: [],
     weather: null,
     race_control_messages: [],
+  team_radio: [],
   };
   render(<OverviewPanel state={state} />);
   const value = screen.getByText("RED");

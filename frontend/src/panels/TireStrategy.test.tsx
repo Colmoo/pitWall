@@ -13,10 +13,12 @@ function driverTick(lap: number, compound: string): SessionState {
         gap_to_leader: null, gap_to_ahead: null, last_lap_time: null, best_lap_time: null,
         tire: { compound, age_laps: 1 }, x: null, y: null,
         lap_number: lap, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+      micro_sectors: [], flying_lap: null, speed: null, throttle: null, brake: null, gear: null, rpm: null, drs: null,
       },
     ],
     weather: null,
     race_control_messages: [],
+  team_radio: [],
   };
 }
 

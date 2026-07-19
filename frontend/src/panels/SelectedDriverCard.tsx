@@ -48,6 +48,34 @@ export function SelectedDriverCard({
           {driver.gap_to_ahead !== null ? `+${driver.gap_to_ahead.toFixed(3)}` : "-"}
         </div>
       </div>
+      {driver.speed !== null && (
+        <div className="pitwall-live-telemetry" data-testid="live-telemetry">
+          <div className="pitwall-stat">
+            <div className="pitwall-stat-label">Speed</div>
+            <div className="pitwall-stat-value cyan">{driver.speed.toFixed(0)} km/h</div>
+          </div>
+          <div className="pitwall-stat">
+            <div className="pitwall-stat-label">Throttle</div>
+            <div className="pitwall-stat-value green">{driver.throttle?.toFixed(0) ?? "-"}%</div>
+          </div>
+          <div className="pitwall-stat">
+            <div className="pitwall-stat-label">Brake</div>
+            <div className={`pitwall-stat-value ${driver.brake ? "red" : ""}`}>{driver.brake ? "ON" : "OFF"}</div>
+          </div>
+          <div className="pitwall-stat">
+            <div className="pitwall-stat-label">Gear</div>
+            <div className="pitwall-stat-value">{driver.gear ?? "-"}</div>
+          </div>
+          <div className="pitwall-stat">
+            <div className="pitwall-stat-label">RPM</div>
+            <div className="pitwall-stat-value">{driver.rpm ?? "-"}</div>
+          </div>
+          <div className="pitwall-stat">
+            <div className="pitwall-stat-label">DRS</div>
+            <div className={`pitwall-stat-value ${driver.drs ? "cyan" : ""}`}>{driver.drs ? "OPEN" : "CLOSED"}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

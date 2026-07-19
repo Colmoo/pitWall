@@ -13,16 +13,19 @@ const sampleState: SessionState = {
       gap_to_leader: null, gap_to_ahead: null, last_lap_time: 90.5, best_lap_time: 90.1,
       tire: { compound: "SOFT", age_laps: 3 }, x: null, y: null,
       lap_number: null, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+      micro_sectors: [], flying_lap: true, speed: null, throttle: null, brake: null, gear: null, rpm: null, drs: null,
     },
     {
       driver_number: "44", abbreviation: "HAM", team: "Mercedes", position: 2,
       gap_to_leader: null, gap_to_ahead: null, last_lap_time: 91.2, best_lap_time: 90.8,
       tire: { compound: "MEDIUM", age_laps: 5 }, x: null, y: null,
       lap_number: null, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+      micro_sectors: [], flying_lap: false, speed: null, throttle: null, brake: null, gear: null, rpm: null, drs: null,
     },
   ],
   weather: null,
   race_control_messages: [],
+  team_radio: [],
 };
 
 test("renders drivers sorted by position with tire and lap info", () => {
@@ -49,4 +52,18 @@ test("clicking a row calls onSelectDriver with that driver's number", () => {
   render(<TimingTower state={sampleState} selectedDriver={null} onSelectDriver={onSelectDriver} />);
   fireEvent.click(screen.getByText("HAM").closest("tr")!);
   expect(onSelectDriver).toHaveBeenCalledWith("44");
+});
+
+test("shows a push/in-out badge per driver based on flying_lap", () => {
+  render(<TimingTower state={sampleState} selectedDriver={null} onSelectDriver={vi.fn()} />);
+  expect(screen.getByText("PUSH")).toBeInTheDocument();
+  expect(screen.getByText("IN/OUT")).toBeInTheDocument();
+});
+
+test("toggling fastest lap only emphasizes the best lap column", () => {
+  render(<TimingTower state={sampleState} selectedDriver={null} onSelectDriver={vi.fn()} />);
+  const toggle = screen.getByLabelText(/fastest lap only/i);
+  expect(toggle).not.toBeChecked();
+  fireEvent.click(toggle);
+  expect(toggle).toBeChecked();
 });

@@ -125,6 +125,94 @@ def test_session_state_from_live_tree_defaults_race_control_messages_to_empty():
     assert state.race_control_messages == []
 
 
+def test_session_state_from_live_tree_parses_weather():
+    tree = _tree(WeatherData={
+        "AirTemp": "22.5", "TrackTemp": "35.0", "Humidity": "50.0", "WindSpeed": "2.1", "Rainfall": "0",
+    })
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    assert state.weather is not None
+    assert state.weather.air_temp == 22.5
+    assert state.weather.rainfall is False
+
+
+def test_session_state_from_live_tree_defaults_weather_to_none_when_missing():
+    state = session_state_from_live_tree(_tree(), datetime.now(timezone.utc))
+    assert state.weather is None
+
+
+def test_session_state_from_live_tree_parses_latest_position_entry():
+    tree = _tree(Position=[
+        {"Entries": {"1": {"X": 100.0, "Y": 200.0}, "44": {"X": 300.0, "Y": 400.0}}},
+        {"Entries": {"1": {"X": 110.0, "Y": 210.0}, "44": {"X": 310.0, "Y": 410.0}}},
+    ])
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    assert ver.x == 110.0
+    assert ver.y == 210.0
+
+
+def test_session_state_from_live_tree_parses_latest_car_data_channels():
+    tree = _tree(CarData=[
+        {"Entries": {"1": {"Channels": {"0": 11000, "2": 310, "3": 7, "4": 100, "5": 0, "45": 12}}}},
+    ])
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    assert ver.rpm == 11000
+    assert ver.speed == 310
+    assert ver.gear == 7
+    assert ver.throttle == 100
+    assert ver.brake is False
+    assert ver.drs is True
+
+
+def test_session_state_from_live_tree_parses_micro_sectors():
+    tree = _tree()
+    tree["TimingData"]["Lines"]["1"]["Sectors"] = [
+        {"Value": "28.1", "Segments": [{"Status": 2051}, {"Status": 2049}]},
+        {"Value": "32.0", "Segments": [{"Status": 2052}]},
+        {"Value": "32.356", "Segments": [{"Status": 2048}]},
+    ]
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    assert ver.micro_sectors == ["green", "yellow", "purple", "none"]
+
+
+def test_session_state_from_live_tree_flying_lap_false_when_in_pit():
+    tree = _tree()
+    tree["TimingData"]["Lines"]["1"]["InPit"] = True
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    assert ver.flying_lap is False
+
+
+def test_session_state_from_live_tree_flying_lap_true_when_on_track_with_position():
+    state = session_state_from_live_tree(_tree(), datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    assert ver.flying_lap is True
+
+
+def test_session_state_from_live_tree_parses_team_radio():
+    tree = _tree(
+        SessionInfo={"Path": "2026/2026-07-09_Silverstone/2026-07-09_Race/"},
+        TeamRadio={"Captures": {
+            "0": {"Utc": "2026-07-09T13:05:09", "RacingNumber": "1", "Path": "TeamRadio/VERMax01_1_20260709_130509.mp3"},
+        }},
+    )
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    assert len(state.team_radio) == 1
+    clip = state.team_radio[0]
+    assert clip.driver_number == "1"
+    assert clip.url == (
+        "https://livetiming.formula1.com/static/2026/2026-07-09_Silverstone/2026-07-09_Race/"
+        "TeamRadio/VERMax01_1_20260709_130509.mp3"
+    )
+
+
+def test_session_state_from_live_tree_defaults_team_radio_to_empty():
+    state = session_state_from_live_tree(_tree(), datetime.now(timezone.utc))
+    assert state.team_radio == []
+
+
 @pytest.mark.asyncio
 async def test_live_adapter_stream_yields_states_from_sse_events():
     sse_body = (

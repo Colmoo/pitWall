@@ -1,12 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SessionState } from "../types";
 
 const API_URL = import.meta.env.VITE_BACKEND_API_URL ?? "http://localhost:8000";
 
 type SessionParams = { year: number; event: string; sessionType: string } | null;
 
+// pan offset (in viewBox units) and zoom scale, relative to the default fit view
+type View = { panX: number; panY: number; scale: number };
+const DEFAULT_VIEW: View = { panX: 0, panY: 0, scale: 1 };
+
 export function TrackMap({ state, sessionParams }: { state: SessionState | null; sessionParams: SessionParams }) {
   const [points, setPoints] = useState<[number, number][]>([]);
+  const [view, setView] = useState<View>(DEFAULT_VIEW);
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!sessionParams) return;
@@ -42,12 +48,54 @@ export function TrackMap({ state, sessionParams }: { state: SessionState | null;
 
   const driversWithPosition = state?.drivers.filter((d) => d.x !== null && d.y !== null) ?? [];
 
+  const scaledSize = viewSize / view.scale;
+  const vbX = centerX - scaledSize / 2 + view.panX;
+  const vbY = centerY - scaledSize / 2 + view.panY;
+
+  function handleWheel(e: React.WheelEvent<SVGSVGElement>) {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    setView((v) => ({ ...v, scale: Math.min(8, Math.max(0.5, v.scale * factor)) }));
+  }
+
+  function handlePointerDown(e: React.PointerEvent<SVGSVGElement>) {
+    dragRef.current = { x: e.clientX, y: e.clientY };
+    (e.target as Element).setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.x;
+    const dy = e.clientY - dragRef.current.y;
+    dragRef.current = { x: e.clientX, y: e.clientY };
+    // viewBox units per screen pixel, roughly (svg is square and rendered at ~panel width)
+    const unitsPerPx = scaledSize / (e.currentTarget.clientWidth || scaledSize);
+    setView((v) => ({ ...v, panX: v.panX - dx * unitsPerPx, panY: v.panY - dy * unitsPerPx }));
+  }
+
+  function handlePointerUp() {
+    dragRef.current = null;
+  }
+
   return (
     <>
-      <svg
-        viewBox={`${centerX - viewSize / 2} ${centerY - viewSize / 2} ${viewSize} ${viewSize}`}
-        style={{ width: "100%", height: "auto" }}
-      >
+      <div style={{ position: "relative", width: "100%" }}>
+        <button
+          type="button"
+          className="pitwall-reset-view-button"
+          onClick={() => setView(DEFAULT_VIEW)}
+        >
+          Reset view
+        </button>
+        <svg
+          viewBox={`${vbX} ${vbY} ${scaledSize} ${scaledSize}`}
+          style={{ width: "100%", height: "auto", cursor: dragRef.current ? "grabbing" : "grab", touchAction: "none" }}
+          onWheel={handleWheel}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerUp}
+        >
         <circle
           cx={centerX}
           cy={centerY}
@@ -67,7 +115,8 @@ export function TrackMap({ state, sessionParams }: { state: SessionState | null;
             fill="#facc15"
           />
         ))}
-      </svg>
+        </svg>
+      </div>
       {sessionParams && <div className="pitwall-circuit-name">{sessionParams.event}</div>}
     </>
   );

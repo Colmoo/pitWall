@@ -36,6 +36,7 @@ export function WidgetGrid({
       cols={12}
       rowHeight={30}
       margin={[8, 8]}
+      compactType={"vertical" as const}
       draggableHandle=".pitwall-drag-handle"
       resizeHandles={["s", "w", "e", "n", "sw", "se", "nw", "ne"]}
       onLayoutChange={handleLayoutChange}

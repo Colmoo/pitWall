@@ -36,6 +36,20 @@ export interface DriverState {
   sector_1_time: number | null;
   sector_2_time: number | null;
   sector_3_time: number | null;
+  micro_sectors: string[];
+  flying_lap: boolean | null;
+  speed: number | null;
+  throttle: number | null;
+  brake: boolean | null;
+  gear: number | null;
+  rpm: number | null;
+  drs: boolean | null;
+}
+
+export interface TeamRadioClip {
+  timestamp: string;
+  driver_number: string;
+  url: string;
 }
 
 export interface SessionState {
@@ -44,6 +58,7 @@ export interface SessionState {
   drivers: DriverState[];
   weather: WeatherSnapshot | null;
   race_control_messages: RaceControlMessage[];
+  team_radio: TeamRadioClip[];
 }
 
 export interface AiNote {
