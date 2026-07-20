@@ -14,6 +14,7 @@ const DEFAULT_VIEW: View = { panX: 0, panY: 0, scale: 1 };
 // (from FastF1 telemetry) and drives the per-sector coloring below.
 type LayoutPoint = number[];
 type Corner = { number: number; x: number; y: number };
+type DrsZone = { start_x: number; start_y: number; end_x: number; end_y: number };
 
 // Marshal-sector colors, matching the yellow/blue/magenta convention on official circuit posters.
 const SECTOR_COLORS = ["#f4437d", "#ffd400", "#3ecbff"];
@@ -72,6 +73,7 @@ export function TrackMap({
   const [fetchedPoints, setFetchedPoints] = useState<LayoutPoint[]>([]);
   const [corners, setCorners] = useState<Corner[]>([]);
   const [sectorBoundaries, setSectorBoundaries] = useState<number[]>([]);
+  const [drsZones, setDrsZones] = useState<DrsZone[]>([]);
   const [view, setView] = useState<View>(DEFAULT_VIEW);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -80,10 +82,11 @@ export function TrackMap({
     const url = `${API_URL}/session/track-layout?year=${sessionParams.year}&event=${encodeURIComponent(sessionParams.event)}&session_type=${sessionParams.sessionType}`;
     fetch(url)
       .then((res) => res.json())
-      .then((data: { points: LayoutPoint[]; corners?: Corner[]; sector_boundaries?: number[] }) => {
+      .then((data: { points: LayoutPoint[]; corners?: Corner[]; sector_boundaries?: number[]; drs_zones?: DrsZone[] }) => {
         setFetchedPoints(data.points);
         setCorners(data.corners ?? []);
         setSectorBoundaries(data.sector_boundaries ?? []);
+        setDrsZones(data.drs_zones ?? []);
       });
   }, [sessionParams]);
 
@@ -183,6 +186,20 @@ export function TrackMap({
             <path key={i} d={pathD(seg.points)} fill="none" stroke={seg.color} strokeWidth={width * 0.006} strokeLinecap="round" />
           ))}
         </g>
+        {drsZones.map((z, i) => (
+          <line
+            key={i}
+            data-testid="drs-zone"
+            x1={z.start_x}
+            y1={z.start_y}
+            x2={z.end_x}
+            y2={z.end_y}
+            stroke="#22c55e"
+            strokeOpacity={0.4}
+            strokeWidth={width * 0.014}
+            strokeLinecap="round"
+          />
+        ))}
         {corners.map((c) => (
           <g key={c.number}>
             <circle cx={c.x} cy={c.y} r={width * 0.011} fill="#05070a" stroke="#4b5563" strokeWidth={width * 0.0015} />

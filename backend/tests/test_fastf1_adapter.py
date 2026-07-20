@@ -254,6 +254,38 @@ def test_load_track_layout_includes_corners_and_sector_boundaries(monkeypatch):
     assert layout["points"] == [[0.0, 0.0, 0.0], [1.0, 1.0, 100.0], [2.0, 2.0, 200.0]]
     assert layout["corners"] == [{"number": 1, "x": 5.0, "y": 5.0}, {"number": 2, "x": 15.0, "y": 15.0}]
     assert layout["sector_boundaries"] == [0.0, 150.0, 400.0]
+    assert layout["drs_zones"] == []  # fixture telemetry has no DRS column
+
+
+def test_load_track_layout_approximates_drs_zones_from_open_drs_spans(monkeypatch):
+    # DRS opens (>=10) from Distance 100 to 300 - a real zone, kept - then blips
+    # open for one sample around Distance 520 - noise, dropped as too short.
+    telemetry = pd.DataFrame({
+        "X": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        "Y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        "Distance": [0.0, 100.0, 200.0, 300.0, 400.0, 500.0, 520.0],
+        "DRS": [0, 12, 12, 12, 0, 0, 12],
+    })
+
+    class FakeLap:
+        def get_telemetry(self):
+            return telemetry
+
+    class FakeLaps:
+        def pick_fastest(self):
+            return FakeLap()
+
+    class FakeSession:
+        laps = FakeLaps()
+
+        def get_circuit_info(self):
+            return None
+
+    monkeypatch.setattr("app.fastf1_adapter.get_or_load_session", lambda *args, **kwargs: FakeSession())
+
+    layout = load_track_layout(year=2026, event="Suzuka", session_type="R", cache_dir="/tmp/x")
+
+    assert layout["drs_zones"] == [{"start_x": 1.0, "start_y": 0.0, "end_x": 3.0, "end_y": 0.0}]
 
 
 def test_session_states_from_laps_computes_gap_to_leader_and_ahead():

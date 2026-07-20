@@ -133,6 +133,20 @@ test("shows a name flag above the selected driver's dot", async () => {
   expect(screen.getByTestId("selected-driver-flag")).toHaveTextContent("VER");
 });
 
+test("renders a DRS zone overlay when the layout includes drs_zones", async () => {
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      points: [[0, 0], [10, 0], [10, 10], [0, 10]],
+      drs_zones: [{ start_x: 2, start_y: 0, end_x: 8, end_y: 0 }],
+    }),
+  });
+
+  render(<TrackMap state={null} sessionParams={{ year: 2023, event: "Baku", sessionType: "R" }} />);
+
+  await waitFor(() => expect(screen.getByTestId("drs-zone")).toBeInTheDocument());
+});
+
 test("keeps the viewBox square for a non-square (wide) track so the bezel ring never clips", async () => {
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
