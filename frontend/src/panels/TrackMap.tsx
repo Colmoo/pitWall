@@ -77,17 +77,52 @@ export function TrackMap({
   const [view, setView] = useState<View>(DEFAULT_VIEW);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
 
-  useEffect(() => {
+type TrackLayoutResponse = { points: LayoutPoint[]; corners?: Corner[]; sector_boundaries?: number[]; drs_zones?: DrsZone[] };
+
+useEffect(() => {
     if (!sessionParams) return;
     const url = `${API_URL}/session/track-layout?year=${sessionParams.year}&event=${encodeURIComponent(sessionParams.event)}&session_type=${sessionParams.sessionType}`;
     fetch(url)
       .then((res) => res.json())
-      .then((data: { points: LayoutPoint[]; corners?: Corner[]; sector_boundaries?: number[]; drs_zones?: DrsZone[] }) => {
+      .then((data: TrackLayoutResponse) => {
         setFetchedPoints(data.points);
         setCorners(data.corners ?? []);
         setSectorBoundaries(data.sector_boundaries ?? []);
         setDrsZones(data.drs_zones ?? []);
       });
+  }, [sessionParams]);
+
+  // Live mode has no year/event/session identifier up front, but the backend
+  // resolves one from the live feed itself and loads matching FastF1 circuit
+  // info (corners/sectors/DRS zones) in the background - poll until that
+  // shows up, so live mode gets the same decorated map as replay.
+  useEffect(() => {
+    if (sessionParams) return;
+    let cancelled = false;
+    let found = false;
+    async function poll() {
+      while (!cancelled && !found) {
+        try {
+          const res = await fetch(`${API_URL}/session/live/track-layout`);
+          const data: TrackLayoutResponse = await res.json();
+          if (data.corners?.length || data.sector_boundaries?.length) {
+            found = true;
+            if (!cancelled) {
+              setCorners(data.corners ?? []);
+              setSectorBoundaries(data.sector_boundaries ?? []);
+              setDrsZones(data.drs_zones ?? []);
+            }
+          }
+        } catch {
+          // backend not reachable yet / session not resolved - retry below.
+        }
+        if (!found) await new Promise((r) => setTimeout(r, 5000));
+      }
+    }
+    poll();
+    return () => {
+      cancelled = true;
+    };
   }, [sessionParams]);
 
   // Live mode has no FastF1 (year/event/session) identifier to fetch a layout
@@ -120,7 +155,9 @@ export function TrackMap({
   const centerY = minY + height / 2;
   const viewSize = size + padding * 2;
 
-  const segments = sessionParams ? buildSectorSegments(points, sectorBoundaries) : [{ color: "#3ecbff", points: [...points, points[0]] }];
+  // buildSectorSegments itself falls back to a single plain-colored line when
+  // points carry no per-point distance (traced live points never do).
+  const segments = buildSectorSegments(points, sectorBoundaries);
 
   const driversWithPosition = state?.drivers.filter((d) => d.x !== null && d.y !== null) ?? [];
   const selected = driversWithPosition.find((d) => d.driver_number === selectedDriver) ?? null;

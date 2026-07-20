@@ -258,10 +258,43 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
     )
 
 
+_SESSION_NAME_TO_TYPE = {
+    "Practice 1": "FP1", "Practice 2": "FP2", "Practice 3": "FP3",
+    "Qualifying": "Q", "Sprint Qualifying": "SQ", "Sprint Shootout": "SQ",
+    "Sprint": "S", "Race": "R",
+}
+
+
+def _strip_date_prefix(segment: str) -> str:
+    return segment.split("_", 1)[1].replace("_", " ") if "_" in segment else segment
+
+
+# ponytail: live-timing's SessionInfo.Path segment format
+# ("{year}/{year}-{date}_{Event_Name}/{year}-{date}_{Session_Name}/") is
+# publicly documented (same convention fastf1.livetiming assumes) but not yet
+# verified against a real live stream - return None (skip the FastF1 lookup)
+# rather than guess on a segment that doesn't parse as expected.
+def resolve_fastf1_session_identity(tree: dict) -> tuple[int, str, str] | None:
+    path = tree.get("SessionInfo", {}).get("Path", "")
+    parts = [p for p in path.split("/") if p]
+    if len(parts) < 3:
+        return None
+    try:
+        year = int(parts[0])
+    except ValueError:
+        return None
+    event = _strip_date_prefix(parts[1])
+    session_type = _SESSION_NAME_TO_TYPE.get(_strip_date_prefix(parts[2]))
+    if session_type is None:
+        return None
+    return year, event, session_type
+
+
 class LiveAdapter:
     def __init__(self, sse_url: str):
         self._sse_url = sse_url
         self._transport = None  # test seam: MockTransport in tests, real network otherwise
+        self.last_tree: dict = {}
 
     async def stream(self) -> AsyncIterator[SessionState]:
         tree: dict = {}
@@ -279,6 +312,7 @@ class LiveAdapter:
                                 continue
 
                             tree = payload if event_type == "initial" else merge_patch(tree, payload)
+                            self.last_tree = tree
 
                             state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
                             if state is not None:

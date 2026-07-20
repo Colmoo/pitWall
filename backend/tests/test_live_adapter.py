@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from app.live_adapter import LiveAdapter, session_state_from_live_tree
+from app.live_adapter import LiveAdapter, resolve_fastf1_session_identity, session_state_from_live_tree
 from app.schema import TrackStatus
 
 
@@ -252,3 +252,49 @@ async def test_live_adapter_stream_yields_states_from_sse_events():
     assert len(states) == 2
     assert states[0].drivers[0].last_lap_time == 90.0
     assert states[1].drivers[0].last_lap_time == 89.5
+
+
+def test_resolve_fastf1_session_identity_parses_year_event_and_session_type():
+    tree = {"SessionInfo": {"Path": "2026/2026-07-09_British_Grand_Prix/2026-07-09_Race/"}}
+    assert resolve_fastf1_session_identity(tree) == (2026, "British Grand Prix", "R")
+
+
+def test_resolve_fastf1_session_identity_maps_practice_and_qualifying():
+    assert resolve_fastf1_session_identity(
+        {"SessionInfo": {"Path": "2026/2026-07-09_Suzuka/2026-07-09_Practice_1/"}}
+    ) == (2026, "Suzuka", "FP1")
+    assert resolve_fastf1_session_identity(
+        {"SessionInfo": {"Path": "2026/2026-07-09_Suzuka/2026-07-09_Qualifying/"}}
+    ) == (2026, "Suzuka", "Q")
+
+
+def test_resolve_fastf1_session_identity_returns_none_for_unrecognized_session_name():
+    tree = {"SessionInfo": {"Path": "2026/2026-07-09_Suzuka/2026-07-09_Some_New_Format/"}}
+    assert resolve_fastf1_session_identity(tree) is None
+
+
+def test_resolve_fastf1_session_identity_returns_none_when_missing():
+    assert resolve_fastf1_session_identity({}) is None
+    assert resolve_fastf1_session_identity({"SessionInfo": {}}) is None
+
+
+@pytest.mark.asyncio
+async def test_live_adapter_tracks_last_tree_as_it_streams(monkeypatch):
+    sse_body = (
+        'event: initial\n'
+        'data: {"DriverList": {"1": {"Tla": "VER", "TeamName": "Red Bull"}}, '
+        '"TimingData": {"Lines": {"1": {"Position": "1", "LastLapTime": {"Value": "1:30.000"}}}}, '
+        '"TrackStatus": {"Status": "1"}, '
+        '"SessionInfo": {"Path": "2026/2026-07-09_Silverstone/2026-07-09_Race/"}}\n\n'
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=sse_body)
+
+    adapter = LiveAdapter("http://fake/api/realtime")
+    adapter._transport = httpx.MockTransport(handler)
+
+    states = [state async for state in adapter.stream()]
+
+    assert len(states) == 1
+    assert adapter.last_tree["SessionInfo"]["Path"] == "2026/2026-07-09_Silverstone/2026-07-09_Race/"

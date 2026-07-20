@@ -17,7 +17,7 @@ from app.fastf1_adapter import (
     load_session_states,
     load_track_layout,
 )
-from app.live_adapter import LiveAdapter
+from app.live_adapter import LiveAdapter, resolve_fastf1_session_identity
 from app.replay import ReplayEngine
 from app.schema import SessionState
 
@@ -148,9 +148,45 @@ class LiveRequest(BaseModel):
     sse_url: str = "http://f1-dash-realtime/api/realtime"
 
 
+_EMPTY_TRACK_LAYOUT = {"points": [], "corners": [], "sector_boundaries": [], "drs_zones": []}
+_live_circuit_info: dict | None = None
+_live_circuit_info_key: tuple | None = None
+_live_circuit_info_task: asyncio.Task | None = None
+
+
+async def _load_live_circuit_info(identity: tuple[int, str, str]) -> None:
+    global _live_circuit_info
+    year, event, session_type = identity
+    try:
+        _live_circuit_info = await asyncio.to_thread(
+            load_track_layout, year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
+        )
+    except Exception:
+        # Best-effort parity for live mode - the live feed's session path format
+        # isn't verified against a real stream yet, and the resolved event name
+        # may not match FastF1's schedule. Keep the plain traced map instead of
+        # failing the live session over decorative circuit info.
+        logger.exception("Failed to load matching FastF1 circuit info for live session %s", identity)
+
+
+def _maybe_start_live_circuit_info_lookup(tree: dict) -> None:
+    global _live_circuit_info_key, _live_circuit_info_task
+    identity = resolve_fastf1_session_identity(tree)
+    if identity is None or identity == _live_circuit_info_key:
+        return
+    if _live_circuit_info_task is not None and not _live_circuit_info_task.done():
+        return
+    _live_circuit_info_key = identity
+    _live_circuit_info_task = asyncio.create_task(_load_live_circuit_info(identity))
+
+
 async def _run_live(sse_url: str) -> None:
+    global _live_circuit_info, _live_circuit_info_key
+    _live_circuit_info = None
+    _live_circuit_info_key = None
     adapter = LiveAdapter(sse_url)
     async for state in adapter.stream():
+        _maybe_start_live_circuit_info_lookup(getattr(adapter, "last_tree", {}))
         await _publish_state(state)
 
 
@@ -165,6 +201,13 @@ async def track_layout(year: int, event: str, session_type: str):
     return load_track_layout(
         year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
     )
+
+
+@app.get("/session/live/track-layout")
+async def live_track_layout():
+    # Best-effort circuit info (corners/sectors/DRS zones) matched from the live
+    # feed's own session identity - empty until resolved, or if it never resolves.
+    return _live_circuit_info or _EMPTY_TRACK_LAYOUT
 
 
 @app.get("/session/telemetry")

@@ -20,8 +20,8 @@ test("shows a tracing placeholder in live mode until enough position samples arr
   expect(screen.getByText(/tracing track/i)).toBeInTheDocument();
 });
 
-test("traces the track outline from leader positions in live mode (no sessionParams, no fetch)", async () => {
-  global.fetch = vi.fn();
+test("traces the track outline from leader positions in live mode without waiting on a fetch", async () => {
+  global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ points: [], corners: [], sector_boundaries: [], drs_zones: [] }) });
   const makeState = (x: number, y: number): SessionState => ({
     timestamp: "t",
     track_status: "green",
@@ -43,7 +43,9 @@ test("traces the track outline from leader positions in live mode (no sessionPar
   render(<TrackMap state={history[history.length - 1]} sessionParams={null} history={history} />);
 
   expect(await screen.findByTestId("track-outline")).toBeInTheDocument();
-  expect(global.fetch).not.toHaveBeenCalled();
+  // the outline itself is traced from live positions, with no wait on the
+  // background live-circuit-info fetch (used only for corners/sectors/DRS).
+  expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/session/live/track-layout"));
 });
 
 test("plots a dot for each driver with known x/y", async () => {

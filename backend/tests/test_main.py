@@ -56,6 +56,24 @@ def test_track_layout_endpoint_returns_points(monkeypatch):
     assert resp.json() == layout
 
 
+def test_live_track_layout_endpoint_defaults_to_empty_before_resolved():
+    app_module._live_circuit_info = None
+    resp = client.get("/session/live/track-layout")
+    assert resp.status_code == 200
+    assert resp.json() == {"points": [], "corners": [], "sector_boundaries": [], "drs_zones": []}
+
+
+def test_live_track_layout_endpoint_returns_resolved_circuit_info():
+    layout = {"points": [[0.0, 0.0, 0.0]], "corners": [], "sector_boundaries": [], "drs_zones": []}
+    app_module._live_circuit_info = layout
+    try:
+        resp = client.get("/session/live/track-layout")
+        assert resp.status_code == 200
+        assert resp.json() == layout
+    finally:
+        app_module._live_circuit_info = None
+
+
 def test_live_endpoint_streams_states_over_websocket(monkeypatch):
     from app.schema import SessionState, TrackStatus
     from datetime import datetime, timezone
