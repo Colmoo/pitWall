@@ -2,6 +2,7 @@
   color-scheme: dark;
   --bg: #050607;
   --panel: #0a0c10;
+  --bezel: #22262c;
   --border: #1a1d1f;
   --text: #e5e7eb;
   --label: #6b7280;
@@ -11,6 +12,8 @@
   --red: #f87171;
   --purple: #a78bfa;
   --orange: #fb923c;
+  --f1-red: #e10600;
+  --mono: "SF Mono", Menlo, Consolas, monospace;
 }
 
 * {
@@ -19,27 +22,100 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  /* carbon-fiber weave, kept just above the noise floor */
+  background:
+    repeating-linear-gradient(45deg, #07080a 0 2px, transparent 2px 4px),
+    repeating-linear-gradient(-45deg, #07080a 0 2px, transparent 2px 4px),
+    var(--bg);
   color: var(--text);
   font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
   letter-spacing: 0.1px;
 }
 
+.pitwall-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.pitwall-main {
+  flex: 1;
+}
+
 .pitwall-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   gap: 16px;
   padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #0b0d10, #08090b);
+  border-top: 2px solid var(--f1-red);
+  border-bottom: 1px solid var(--bezel);
   flex-wrap: wrap;
 }
 
-.pitwall-header h1 {
+.pitwall-brand {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
+  font-weight: 700;
   letter-spacing: 3px;
-  color: var(--label);
+  color: var(--text);
   text-transform: uppercase;
+}
+
+.pitwall-brand-block {
+  width: 10px;
+  height: 10px;
+  background: var(--f1-red);
+}
+
+.pitwall-clock {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #ff4d42;
+  text-shadow: 0 0 6px rgba(255, 60, 50, 0.55);
+}
+
+.pitwall-widgets-menu {
+  position: relative;
+}
+
+.pitwall-widgets-menu-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 190px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--bezel);
+  border-radius: 3px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+}
+
+.pitwall-widgets-menu-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.pitwall-widgets-menu-list .pitwall-home-button {
+  margin-top: 4px;
 }
 
 .pitwall-home-button {
@@ -95,30 +171,76 @@ body {
 
 .pitwall-widget-grid {
   position: relative;
-  margin: 8px;
+  margin: 6px;
 }
 
+/* each panel reads as a bezeled monitor on the rig */
 .pitwall-panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  padding: 8px 10px;
+  background: linear-gradient(180deg, #0b0d11, #090b0e);
+  border: 1px solid var(--bezel);
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px #101317, 0 4px 14px rgba(0, 0, 0, 0.5);
+  padding: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .pitwall-panel-body {
   flex: 1;
   overflow: auto;
+  padding: 8px 10px;
 }
 
 .pitwall-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--label);
   font-size: 9px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  margin-bottom: 6px;
+  padding: 5px 8px;
+  background: #0e1114;
+  border-bottom: 1px solid var(--border);
+}
+
+/* status LED */
+.pitwall-panel-title::before {
+  content: "";
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 4px var(--green);
+}
+
+/* grip dots — drag affordance */
+.pitwall-panel-title::after {
+  content: "";
+  order: 2;
+  margin-left: auto;
+  width: 14px;
+  height: 8px;
+  background-image: radial-gradient(circle, #3a4048 1px, transparent 1.2px);
+  background-size: 5px 4px;
+}
+
+.pitwall-panel-close {
+  order: 3;
+  background: none;
+  border: none;
+  color: var(--label);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.pitwall-panel-close:hover {
+  color: var(--red);
 }
 
 .pitwall-drag-handle {
@@ -129,6 +251,28 @@ body {
 .pitwall-drag-handle:active {
   cursor: grabbing;
   color: var(--cyan);
+}
+
+/* grid interaction feedback */
+.pitwall-panel.react-draggable-dragging,
+.pitwall-panel.resizing {
+  box-shadow: 0 0 0 1px var(--cyan), 0 12px 30px rgba(0, 0, 0, 0.7);
+  z-index: 10;
+}
+
+.react-grid-placeholder {
+  background: var(--cyan) !important;
+  opacity: 0.12 !important;
+  border-radius: 4px;
+}
+
+.react-grid-item > .react-resizable-handle {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.react-grid-item:hover > .react-resizable-handle {
+  opacity: 1;
 }
 
 .pitwall-circuit-bezel {
@@ -401,4 +545,33 @@ tr.pitwall-row-selectable {
   border: 1px solid var(--border);
   border-radius: 2px;
   padding: 2px 4px;
+}
+
+/* race control as a bottom ticker bar */
+.pitwall-ticker {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 6px 16px;
+  background: linear-gradient(0deg, #0b0d10, #08090b);
+  border-top: 1px solid var(--bezel);
+}
+
+.pitwall-ticker-label {
+  flex-shrink: 0;
+  color: var(--f1-red);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding-top: 2px;
+}
+
+.pitwall-ticker-body {
+  flex: 1;
+  max-height: 72px;
+  overflow: auto;
 }

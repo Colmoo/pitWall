@@ -15,9 +15,35 @@ test("fetches and renders the track outline for the given session params", async
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/session/track-layout"));
 });
 
-test("shows a placeholder message when no session has been started", () => {
-  render(<TrackMap state={null} sessionParams={null} />);
-  expect(screen.getByText(/start a session/i)).toBeInTheDocument();
+test("shows a tracing placeholder in live mode until enough position samples arrive", () => {
+  render(<TrackMap state={null} sessionParams={null} history={[]} />);
+  expect(screen.getByText(/tracing track/i)).toBeInTheDocument();
+});
+
+test("traces the track outline from leader positions in live mode (no sessionParams, no fetch)", async () => {
+  global.fetch = vi.fn();
+  const makeState = (x: number, y: number): SessionState => ({
+    timestamp: "t",
+    track_status: "green",
+    drivers: [
+      {
+        driver_number: "1", abbreviation: "VER", team: "Red Bull", position: 1,
+        gap_to_leader: null, gap_to_ahead: null, last_lap_time: null, best_lap_time: null,
+        tire: { compound: "SOFT", age_laps: 1 }, x, y,
+        lap_number: 1, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+        micro_sectors: [], flying_lap: null, speed: null, throttle: null, brake: null, gear: null, rpm: null, drs: null,
+      },
+    ],
+    weather: null,
+    race_control_messages: [],
+    team_radio: [],
+  });
+  const history = [makeState(0, 0), makeState(10, 0), makeState(10, 10)];
+
+  render(<TrackMap state={history[history.length - 1]} sessionParams={null} history={history} />);
+
+  expect(await screen.findByTestId("track-outline")).toBeInTheDocument();
+  expect(global.fetch).not.toHaveBeenCalled();
 });
 
 test("plots a dot for each driver with known x/y", async () => {

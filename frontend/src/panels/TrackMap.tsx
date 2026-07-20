@@ -9,8 +9,16 @@ type SessionParams = { year: number; event: string; sessionType: string } | null
 type View = { panX: number; panY: number; scale: number };
 const DEFAULT_VIEW: View = { panX: 0, panY: 0, scale: 1 };
 
-export function TrackMap({ state, sessionParams }: { state: SessionState | null; sessionParams: SessionParams }) {
-  const [points, setPoints] = useState<[number, number][]>([]);
+export function TrackMap({
+  state,
+  sessionParams,
+  history = [],
+}: {
+  state: SessionState | null;
+  sessionParams: SessionParams;
+  history?: SessionState[];
+}) {
+  const [fetchedPoints, setFetchedPoints] = useState<[number, number][]>([]);
   const [view, setView] = useState<View>(DEFAULT_VIEW);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -19,15 +27,23 @@ export function TrackMap({ state, sessionParams }: { state: SessionState | null;
     const url = `${API_URL}/session/track-layout?year=${sessionParams.year}&event=${encodeURIComponent(sessionParams.event)}&session_type=${sessionParams.sessionType}`;
     fetch(url)
       .then((res) => res.json())
-      .then((data: { points: [number, number][] }) => setPoints(data.points));
+      .then((data: { points: [number, number][] }) => setFetchedPoints(data.points));
   }, [sessionParams]);
 
-  if (!sessionParams) {
-    return <p>Start a session to see the track map.</p>;
-  }
+  // Live mode has no FastF1 (year/event/session) identifier to fetch a layout
+  // with, so trace the circuit from the leader's live x/y positions instead -
+  // no separate request, no waiting on a FastF1 session load.
+  const tracedPoints: [number, number][] = sessionParams
+    ? []
+    : history
+        .map((s) => s.drivers.find((d) => d.position === 1) ?? s.drivers[0])
+        .filter((d): d is NonNullable<typeof d> => d != null && d.x != null && d.y != null)
+        .map((d) => [d.x as number, d.y as number]);
 
-  if (points.length === 0) {
-    return <p>Loading track layout...</p>;
+  const points = sessionParams ? fetchedPoints : tracedPoints;
+
+  if (points.length < 2) {
+    return <p>{sessionParams ? "Loading track layout..." : "Tracing track from live car positions..."}</p>;
   }
 
   const xs = points.map((p) => p[0]);

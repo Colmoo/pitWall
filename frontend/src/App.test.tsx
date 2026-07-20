@@ -13,6 +13,7 @@ class FakeWebSocket {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   FakeWebSocket.instances = [];
   // @ts-expect-error test double
   global.WebSocket = FakeWebSocket;
@@ -109,6 +110,25 @@ test("auto-selects the race leader once session data arrives and highlights thei
     const row = screen.getAllByText("VER").map((el) => el.closest("tr.pitwall-row-selectable")).find(Boolean);
     expect(row).toHaveClass("pitwall-row-selected");
   });
+});
+
+test("widgets can be hidden via the close button and restored via the Widgets menu", async () => {
+  await startReplay();
+  expect(screen.getByText("Overview")).toBeInTheDocument();
+
+  // hide via the panel's close button
+  fireEvent.click(screen.getByRole("button", { name: /hide overview/i }));
+  expect(screen.queryByText("Overview")).not.toBeInTheDocument();
+
+  // restore via the Widgets menu checkbox
+  fireEvent.click(screen.getByRole("button", { name: /widgets/i }));
+  fireEvent.click(screen.getByRole("checkbox", { name: /overview/i }));
+  expect(screen.getByRole("button", { name: /hide overview/i })).toBeInTheDocument();
+
+  // hide again, then reset layout restores everything
+  fireEvent.click(screen.getByRole("button", { name: /hide overview/i }));
+  fireEvent.click(screen.getByRole("button", { name: /reset layout/i }));
+  expect(screen.getByRole("button", { name: /hide overview/i })).toBeInTheDocument();
 });
 
 test("telemetry tab lets you add a driver comparison selection", async () => {

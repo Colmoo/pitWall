@@ -5,11 +5,12 @@ type PanelProps = {
   id: string;
   title: string;
   className?: string;
+  onClose?: () => void;
   children: ReactNode;
 } & HTMLAttributes<HTMLDivElement>;
 
 export const Panel = forwardRef<HTMLDivElement, PanelProps>(function Panel(
-  { id, title, className, children, ...rest },
+  { id, title, className, onClose, children, ...rest },
   ref,
 ) {
   return (
@@ -19,7 +20,19 @@ export const Panel = forwardRef<HTMLDivElement, PanelProps>(function Panel(
       className={className ? `pitwall-panel ${className}` : "pitwall-panel"}
       {...rest}
     >
-      <div className="pitwall-panel-title pitwall-drag-handle">{title}</div>
+      <div className="pitwall-panel-title pitwall-drag-handle">
+        {title}
+        {onClose && (
+          <button
+            type="button"
+            className="pitwall-panel-close"
+            aria-label={`Hide ${title}`}
+            onClick={onClose}
+          >
+            ×
+          </button>
+        )}
+      </div>
       <div className="pitwall-panel-body">{children}</div>
     </div>
   );

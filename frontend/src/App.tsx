@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import "./App.css";
 import type { SessionState } from "./types";
 import { Panel } from "./panels/Panel";
@@ -39,11 +40,23 @@ const DASHBOARD_DEFAULT_LAYOUT: WidgetLayoutItem[] = [
   { i: "ai-chat", x: 9, y: 34, w: 3, h: 8 },
 ];
 
+const LAYOUT_KEY = "pitwall-dashboard-layout";
+const HIDDEN_KEY = "pitwall-hidden-widgets";
+
 function trackStatusColorClass(status: SessionState["track_status"] | undefined): string {
   if (status === "green") return "pitwall-flag-green";
   if (status === "yellow" || status === "safety_car" || status === "virtual_safety_car") return "pitwall-flag-yellow";
   if (status === "red") return "pitwall-flag-red";
   return "";
+}
+
+function UtcClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <div className="pitwall-clock">{now.toISOString().slice(11, 19)} UTC</div>;
 }
 
 const WS_URL = import.meta.env.VITE_BACKEND_WS_URL ?? "ws://localhost:8000/ws/session";
@@ -58,6 +71,31 @@ export default function App() {
 
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "telemetry">("dashboard");
+
+  const [hiddenWidgets, setHiddenWidgets] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(HIDDEN_KEY) ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
+  const [widgetsMenuOpen, setWidgetsMenuOpen] = useState(false);
+  const [layoutVersion, setLayoutVersion] = useState(0);
+
+  function setHidden(next: string[]) {
+    setHiddenWidgets(next);
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
+  }
+
+  function toggleWidget(id: string) {
+    setHidden(hiddenWidgets.includes(id) ? hiddenWidgets.filter((w) => w !== id) : [...hiddenWidgets, id]);
+  }
+
+  function resetLayout() {
+    localStorage.removeItem(LAYOUT_KEY);
+    setHidden([]);
+    setLayoutVersion((v) => v + 1);
+  }
 
   useEffect(() => {
     if (selectedDriver === null && latest && latest.drivers.length > 0) {
@@ -97,10 +135,41 @@ export default function App() {
     setSelectedDriver(null);
   }
 
+  const widgets: { id: string; title: string; className?: string; node: ReactNode }[] = [
+    { id: "overview", title: "Overview", node: <OverviewPanel state={latest} /> },
+    {
+      id: "timing-tower",
+      title: "Timing Tower",
+      node: <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />,
+    },
+    {
+      id: "circuit",
+      title: "Circuit",
+      className: "pitwall-circuit-bezel",
+      node: <TrackMap state={latest} sessionParams={sessionParams} history={history} />,
+    },
+    { id: "sector-times", title: "Sector Times", node: <SectorTimes state={latest} /> },
+    { id: "gap-trend", title: "Gap Trend (to Leader)", node: <GapTrendChart history={history} selectedDriver={selectedDriver} /> },
+    { id: "tire-strategy", title: "Tire Strategy", node: <TireStrategy history={history} /> },
+    { id: "selected-driver", title: "Selected Driver", node: <SelectedDriverCard state={latest} selectedDriver={selectedDriver} /> },
+    {
+      id: "telemetry",
+      title: "Telemetry",
+      node: <TelemetryStack sessionParams={sessionParams} state={latest} selectedDriver={selectedDriver} />,
+    },
+    { id: "weather", title: "Weather", node: <WeatherPanel state={latest} /> },
+    { id: "team-radio", title: "Team Radio", node: <TeamRadioPanel state={latest} /> },
+    { id: "race-engineer-notes", title: "Race Engineer Notes", node: <RaceEngineerNotes notes={notes} /> },
+    { id: "ai-chat", title: "Ask The Engineer", node: <AiChat /> },
+  ];
+
   return (
-    <div>
+    <div className="pitwall-shell">
       <header className="pitwall-header">
-        <h1>PitWall</h1>
+        <h1 className="pitwall-brand">
+          <span className="pitwall-brand-block" aria-hidden="true" />
+          PitWall
+        </h1>
         <button type="button" className="pitwall-home-button" onClick={goHome}>
           ← Home
         </button>
@@ -120,60 +189,62 @@ export default function App() {
             Telemetry
           </button>
         </nav>
+        {activeTab === "dashboard" && (
+          <div className="pitwall-widgets-menu">
+            <button
+              type="button"
+              className={widgetsMenuOpen ? "pitwall-tab pitwall-tab-active" : "pitwall-tab"}
+              onClick={() => setWidgetsMenuOpen((open) => !open)}
+            >
+              Widgets ▾
+            </button>
+            {widgetsMenuOpen && (
+              <div className="pitwall-widgets-menu-list">
+                {widgets.map((w) => (
+                  <label key={w.id}>
+                    <input
+                      type="checkbox"
+                      checked={!hiddenWidgets.includes(w.id)}
+                      onChange={() => toggleWidget(w.id)}
+                    />
+                    {w.title}
+                  </label>
+                ))}
+                <button type="button" className="pitwall-home-button" onClick={resetLayout}>
+                  Reset layout
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        <UtcClock />
         <div className={`pitwall-flag-badge ${trackStatusColorClass(latest?.track_status)}`}>
           {latest ? latest.track_status.replaceAll("_", " ").toUpperCase() : "—"}
         </div>
       </header>
       {activeTab === "dashboard" && (
-        <main>
-          <WidgetGrid storageKey="pitwall-dashboard-layout" defaultLayout={DASHBOARD_DEFAULT_LAYOUT}>
-            <Panel key="overview" id="overview" title="Overview">
-              <OverviewPanel state={latest} />
-            </Panel>
-            <Panel key="timing-tower" id="timing-tower" title="Timing Tower">
-              <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />
-            </Panel>
-            <Panel key="circuit" id="circuit" title="Circuit" className="pitwall-circuit-bezel">
-              <TrackMap state={latest} sessionParams={sessionParams} />
-            </Panel>
-            <Panel key="sector-times" id="sector-times" title="Sector Times">
-              <SectorTimes state={latest} />
-            </Panel>
-            <Panel key="gap-trend" id="gap-trend" title="Gap Trend (to Leader)">
-              <GapTrendChart history={history} selectedDriver={selectedDriver} />
-            </Panel>
-            <Panel key="tire-strategy" id="tire-strategy" title="Tire Strategy">
-              <TireStrategy history={history} />
-            </Panel>
-            <Panel key="selected-driver" id="selected-driver" title="Selected Driver">
-              <SelectedDriverCard state={latest} selectedDriver={selectedDriver} />
-            </Panel>
-            <Panel key="telemetry" id="telemetry" title="Telemetry">
-              <TelemetryStack sessionParams={sessionParams} state={latest} selectedDriver={selectedDriver} />
-            </Panel>
-            <Panel key="weather" id="weather" title="Weather">
-              <WeatherPanel state={latest} />
-            </Panel>
-            <Panel key="team-radio" id="team-radio" title="Team Radio">
-              <TeamRadioPanel state={latest} />
-            </Panel>
-            <Panel key="race-engineer-notes" id="race-engineer-notes" title="Race Engineer Notes">
-              <RaceEngineerNotes notes={notes} />
-            </Panel>
-            <Panel key="ai-chat" id="ai-chat" title="Ask The Engineer">
-              <AiChat />
-            </Panel>
+        <main className="pitwall-main">
+          <WidgetGrid key={layoutVersion} storageKey={LAYOUT_KEY} defaultLayout={DASHBOARD_DEFAULT_LAYOUT}>
+            {widgets
+              .filter((w) => !hiddenWidgets.includes(w.id))
+              .map((w) => (
+                <Panel key={w.id} id={w.id} title={w.title} className={w.className} onClose={() => toggleWidget(w.id)}>
+                  {w.node}
+                </Panel>
+              ))}
           </WidgetGrid>
         </main>
       )}
       {activeTab === "telemetry" && (
-        <main>
+        <main className="pitwall-main">
           <TelemetryTab sessionParams={sessionParams} state={latest} />
         </main>
       )}
-      <footer className="pitwall-panel" style={{ margin: "0 8px 8px" }}>
-        <div className="pitwall-panel-title">Race Control</div>
-        <RaceControlTicker state={latest} />
+      <footer className="pitwall-ticker">
+        <span className="pitwall-ticker-label">Race Control</span>
+        <div className="pitwall-ticker-body">
+          <RaceControlTicker state={latest} />
+        </div>
       </footer>
     </div>
   );

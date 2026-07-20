@@ -91,9 +91,25 @@ def test_session_state_from_live_tree_defaults_unknown_track_status_to_green():
     assert state.track_status == TrackStatus.GREEN
 
 
-def test_session_state_from_live_tree_returns_none_when_data_incomplete():
-    assert session_state_from_live_tree({"Heartbeat": {"Utc": "now"}}, datetime.now(timezone.utc)) is None
-    assert session_state_from_live_tree({"DriverList": {"1": {"Tla": "VER"}}}, datetime.now(timezone.utc)) is None
+def test_session_state_from_live_tree_returns_none_only_when_tree_is_empty():
+    assert session_state_from_live_tree({}, datetime.now(timezone.utc)) is None
+
+
+def test_session_state_from_live_tree_emits_empty_drivers_before_timing_data_ready():
+    state = session_state_from_live_tree({"Heartbeat": {"Utc": "now"}}, datetime.now(timezone.utc))
+    assert state is not None
+    assert state.drivers == []
+
+
+def test_session_state_from_live_tree_emits_weather_before_driver_timing_ready():
+    state = session_state_from_live_tree(
+        {"WeatherData": {"AirTemp": "24.0", "TrackTemp": "31.0", "Humidity": "60", "WindSpeed": "1.2", "Rainfall": "0"}},
+        datetime.now(timezone.utc),
+    )
+    assert state is not None
+    assert state.drivers == []
+    assert state.weather is not None
+    assert state.weather.air_temp == 24.0
 
 
 def test_session_state_from_live_tree_parses_race_control_messages():

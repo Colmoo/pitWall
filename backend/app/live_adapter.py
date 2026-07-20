@@ -182,65 +182,68 @@ def _parse_team_radio(tree: dict) -> list[TeamRadioClip]:
 
 
 def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionState | None:
+    # ponytail: only bail on a completely empty tree (nothing merged yet).
+    # Driver/timing data lags behind weather, team radio, and race control in
+    # the upstream feed - emit whatever's ready instead of holding everything
+    # back until DriverList + TimingData both show up.
+    if not tree:
+        return None
+
     driver_list = tree.get("DriverList")
     timing_lines = tree.get("TimingData", {}).get("Lines")
-    if not driver_list or not timing_lines:
-        return None
-
-    app_data_lines = tree.get("TimingAppData", {}).get("Lines", {})
-    position_entries = _latest_position_entries(tree)
-    car_data_entries = _latest_car_data_entries(tree)
 
     drivers: list[DriverState] = []
-    for number, timing in timing_lines.items():
-        driver_info = driver_list.get(number)
-        if not isinstance(driver_info, dict):
-            continue
-        position = timing.get("Position")
-        if not position:
-            continue
+    if driver_list and timing_lines:
+        app_data_lines = tree.get("TimingAppData", {}).get("Lines", {})
+        position_entries = _latest_position_entries(tree)
+        car_data_entries = _latest_car_data_entries(tree)
 
-        sectors = timing.get("Sectors", [])
-        stints = app_data_lines.get(number, {}).get("Stints", [])
-        latest_stint = stints[-1] if stints else {}
+        for number, timing in timing_lines.items():
+            driver_info = driver_list.get(number)
+            if not isinstance(driver_info, dict):
+                continue
+            position = timing.get("Position")
+            if not position:
+                continue
 
-        pos_entry = position_entries.get(number, {})
-        channels = car_data_entries.get(number, {}).get("Channels", {})
-        drs_value = channels.get(_CAR_CHANNEL_DRS)
+            sectors = timing.get("Sectors", [])
+            stints = app_data_lines.get(number, {}).get("Stints", [])
+            latest_stint = stints[-1] if stints else {}
 
-        drivers.append(
-            DriverState(
-                driver_number=number,
-                abbreviation=driver_info.get("Tla", number),
-                team=driver_info.get("TeamName", ""),
-                position=int(position),
-                gap_to_leader=_parse_gap(timing.get("GapToLeader")),
-                gap_to_ahead=_parse_gap(timing.get("IntervalToPositionAhead", {}).get("Value")),
-                last_lap_time=_parse_lap_time(timing.get("LastLapTime", {}).get("Value")),
-                best_lap_time=_parse_lap_time(timing.get("BestLapTime", {}).get("Value")),
-                tire=Tire(
-                    compound=latest_stint.get("Compound", "UNKNOWN"),
-                    age_laps=int(latest_stint.get("TotalLaps", 0)),
-                ),
-                lap_number=timing.get("NumberOfLaps"),
-                sector_1_time=_parse_sector(sectors, 0),
-                sector_2_time=_parse_sector(sectors, 1),
-                sector_3_time=_parse_sector(sectors, 2),
-                micro_sectors=_parse_micro_sectors(sectors),
-                flying_lap=_parse_flying_lap(timing),
-                x=pos_entry.get("X"),
-                y=pos_entry.get("Y"),
-                speed=channels.get(_CAR_CHANNEL_SPEED),
-                throttle=channels.get(_CAR_CHANNEL_THROTTLE),
-                brake=bool(channels.get(_CAR_CHANNEL_BRAKE)) if _CAR_CHANNEL_BRAKE in channels else None,
-                gear=channels.get(_CAR_CHANNEL_GEAR),
-                rpm=channels.get(_CAR_CHANNEL_RPM),
-                drs=bool(drs_value) if drs_value is not None else None,
+            pos_entry = position_entries.get(number, {})
+            channels = car_data_entries.get(number, {}).get("Channels", {})
+            drs_value = channels.get(_CAR_CHANNEL_DRS)
+
+            drivers.append(
+                DriverState(
+                    driver_number=number,
+                    abbreviation=driver_info.get("Tla", number),
+                    team=driver_info.get("TeamName", ""),
+                    position=int(position),
+                    gap_to_leader=_parse_gap(timing.get("GapToLeader")),
+                    gap_to_ahead=_parse_gap(timing.get("IntervalToPositionAhead", {}).get("Value")),
+                    last_lap_time=_parse_lap_time(timing.get("LastLapTime", {}).get("Value")),
+                    best_lap_time=_parse_lap_time(timing.get("BestLapTime", {}).get("Value")),
+                    tire=Tire(
+                        compound=latest_stint.get("Compound", "UNKNOWN"),
+                        age_laps=int(latest_stint.get("TotalLaps", 0)),
+                    ),
+                    lap_number=timing.get("NumberOfLaps"),
+                    sector_1_time=_parse_sector(sectors, 0),
+                    sector_2_time=_parse_sector(sectors, 1),
+                    sector_3_time=_parse_sector(sectors, 2),
+                    micro_sectors=_parse_micro_sectors(sectors),
+                    flying_lap=_parse_flying_lap(timing),
+                    x=pos_entry.get("X"),
+                    y=pos_entry.get("Y"),
+                    speed=channels.get(_CAR_CHANNEL_SPEED),
+                    throttle=channels.get(_CAR_CHANNEL_THROTTLE),
+                    brake=bool(channels.get(_CAR_CHANNEL_BRAKE)) if _CAR_CHANNEL_BRAKE in channels else None,
+                    gear=channels.get(_CAR_CHANNEL_GEAR),
+                    rpm=channels.get(_CAR_CHANNEL_RPM),
+                    drs=bool(drs_value) if drs_value is not None else None,
+                )
             )
-        )
-
-    if not drivers:
-        return None
 
     status_code = tree.get("TrackStatus", {}).get("Status")
     track_status = _TRACK_STATUS_CODES.get(status_code, TrackStatus.GREEN)
