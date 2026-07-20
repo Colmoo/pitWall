@@ -10,6 +10,27 @@ def _sector_seconds(value) -> float | None:
     return None if pd.isna(value) else value.total_seconds()
 
 
+def _synthesize_positions(laps: pd.DataFrame) -> pd.Series:
+    # Practice and Qualifying laps carry no official per-lap Position from
+    # FastF1 (it's Race-only) - rank each driver by their best lap time so
+    # far instead, mirroring what an FP/Q timing screen shows, so those
+    # session types aren't entirely filtered out below.
+    positions = pd.Series(index=laps.index, dtype="float64")
+    best_by_driver: dict[str, float] = {}
+    for idx, row in laps.sort_values("Time").iterrows():
+        if pd.isna(row["LapTime"]):
+            continue
+        number = row["DriverNumber"]
+        seconds = row["LapTime"].total_seconds()
+        best = best_by_driver.get(number)
+        if best is None or seconds < best:
+            best = seconds
+        best_by_driver[number] = best
+        ranking = sorted(best_by_driver, key=best_by_driver.get)
+        positions[idx] = ranking.index(number) + 1
+    return positions
+
+
 def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> list[SessionState]:
     states: list[SessionState] = []
     best_lap_by_driver: dict[str, float] = {}
@@ -210,7 +231,12 @@ def load_driver_lap_telemetry(
     if driver_laps.empty:
         return {"distance": [], "speed": [], "throttle": [], "brake": [], "gear": [], "rpm": []}
 
-    car_data = driver_laps.iloc[0].get_car_data().add_distance()
+    try:
+        car_data = driver_laps.iloc[0].get_car_data().add_distance()
+    except fastf1.core.DataNotLoadedError:
+        # Very recent/in-progress sessions can have lap data published before
+        # car telemetry is - degrade to empty rather than 500.
+        return {"distance": [], "speed": [], "throttle": [], "brake": [], "gear": [], "rpm": []}
     return {
         "distance": car_data["Distance"].tolist(),
         "speed": car_data["Speed"].tolist(),
@@ -227,7 +253,11 @@ def load_session_states(year: int, event: str, session_type: str, cache_dir: str
     # an absolute datetime like session.date - use session.date as the anchor for
     # lap "Time" deltas, which is accurate enough for display purposes.
     session_start = session.date.to_pydatetime()
-    states = session_states_from_laps(session.laps, session_start)
+    laps = session.laps
+    if laps["Position"].isna().all():
+        laps = laps.copy()
+        laps["Position"] = _synthesize_positions(laps)
+    states = session_states_from_laps(laps, session_start)
     attach_weather(states, session.weather_data, session_start)
     attach_race_control_messages(states, session.race_control_messages)
     try:

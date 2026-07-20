@@ -155,7 +155,7 @@ export default function App() {
     {
       id: "telemetry",
       title: "Telemetry",
-      node: <TelemetryStack sessionParams={sessionParams} state={latest} selectedDriver={selectedDriver} />,
+      node: <TelemetryStack sessionParams={sessionParams} state={latest} history={history} selectedDriver={selectedDriver} />,
     },
     { id: "weather", title: "Weather", node: <WeatherPanel state={latest} /> },
     { id: "team-radio", title: "Team Radio", node: <TeamRadioPanel state={latest} /> },
@@ -237,7 +237,7 @@ export default function App() {
       )}
       {activeTab === "telemetry" && (
         <main className="pitwall-main">
-          <TelemetryTab sessionParams={sessionParams} state={latest} />
+          <TelemetryTab sessionParams={sessionParams} state={latest} history={history} />
         </main>
       )}
       <footer className="pitwall-ticker">

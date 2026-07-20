@@ -4,7 +4,7 @@ export function WeatherPanel({ state }: { state: SessionState | null }) {
   const weather = state?.weather ?? null;
 
   if (!weather) {
-    return <p>Weather unavailable in live mode.</p>;
+    return <p>No weather data yet.</p>;
   }
 
   return (

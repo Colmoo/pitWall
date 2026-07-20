@@ -6,6 +6,8 @@ export type Traces = { distance: number[]; speed: number[]; throttle: number[]; 
 
 export type TelemetrySessionParams = { year: number; event: string; sessionType: string } | null;
 
+const EMPTY_TRACES: Traces = { distance: [], speed: [], throttle: [], brake: [], gear: [], rpm: [] };
+
 export function useDriverLapTelemetry(
   sessionParams: TelemetrySessionParams,
   driver: string | null,
@@ -19,9 +21,16 @@ export function useDriverLapTelemetry(
     const url =
       `${API_URL}/session/telemetry?year=${sessionParams.year}&event=${encodeURIComponent(sessionParams.event)}` +
       `&session_type=${sessionParams.sessionType}&driver=${driver}&lap_number=${lapNumber}`;
+    let cancelled = false;
     fetch(url)
-      .then((res) => res.json())
-      .then((data: Traces) => setTraces(data));
+      .then((res) => (res.ok ? res.json() : EMPTY_TRACES))
+      .catch(() => EMPTY_TRACES)
+      .then((data: Traces) => {
+        if (!cancelled) setTraces(data);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [sessionParams, driver, lapNumber]);
 
   return traces;

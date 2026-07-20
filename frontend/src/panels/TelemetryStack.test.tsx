@@ -30,6 +30,7 @@ test("fetches and renders traces for the selected driver's current lap", async (
     <TelemetryStack
       sessionParams={{ year: 2023, event: "British Grand Prix", sessionType: "R" }}
       state={sampleState}
+      history={[sampleState]}
       selectedDriver="1"
     />,
   );
@@ -40,9 +41,18 @@ test("fetches and renders traces for the selected driver's current lap", async (
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("lap_number=5"));
 });
 
-test("shows unavailable message in live mode", () => {
-  render(<TelemetryStack sessionParams={null} state={sampleState} selectedDriver="1" />);
-  expect(screen.getByText(/unavailable in live mode/i)).toBeInTheDocument();
+test("shows waiting message in live mode with no telemetry yet", () => {
+  render(<TelemetryStack sessionParams={null} state={sampleState} history={[sampleState]} selectedDriver="1" />);
+  expect(screen.getByText(/waiting for live telemetry/i)).toBeInTheDocument();
+});
+
+test("renders live telemetry traces from session history in live mode", () => {
+  const liveHistory: SessionState[] = [
+    { ...sampleState, drivers: [{ ...sampleState.drivers[0], speed: 250, throttle: 100, brake: false, gear: 6, rpm: 11000 }] },
+    { ...sampleState, drivers: [{ ...sampleState.drivers[0], speed: 260, throttle: 100, brake: false, gear: 6, rpm: 11200 }] },
+  ];
+  render(<TelemetryStack sessionParams={null} state={liveHistory[1]} history={liveHistory} selectedDriver="1" />);
+  expect(screen.getByTestId("telemetry-trace-speed")).toBeInTheDocument();
 });
 
 test("shows placeholder when no driver is selected", () => {
@@ -50,6 +60,7 @@ test("shows placeholder when no driver is selected", () => {
     <TelemetryStack
       sessionParams={{ year: 2023, event: "British Grand Prix", sessionType: "R" }}
       state={sampleState}
+      history={[sampleState]}
       selectedDriver={null}
     />,
   );

@@ -1,6 +1,7 @@
 import type { SessionState } from "../types";
 import { useDriverLapTelemetry } from "../api/useDriverLapTelemetry";
 import type { TelemetrySessionParams } from "../api/useDriverLapTelemetry";
+import { useLiveDriverTelemetry } from "../api/useLiveDriverTelemetry";
 
 function Trace({ testId, values, max, color }: { testId: string; values: number[]; max: number; color: string }) {
   const width = 100;
@@ -19,24 +20,25 @@ function Trace({ testId, values, max, color }: { testId: string; values: number[
 export function TelemetryStack({
   sessionParams,
   state,
+  history,
   selectedDriver,
 }: {
   sessionParams: TelemetrySessionParams;
   state: SessionState | null;
+  history: SessionState[];
   selectedDriver: string | null;
 }) {
   const driver = state?.drivers.find((d) => d.driver_number === selectedDriver) ?? null;
   const lapNumber = driver?.lap_number ?? null;
-  const traces = useDriverLapTelemetry(sessionParams, selectedDriver, lapNumber);
+  const replayTraces = useDriverLapTelemetry(sessionParams, selectedDriver, lapNumber);
+  const liveTraces = useLiveDriverTelemetry(history, selectedDriver, lapNumber);
+  const traces = sessionParams ? replayTraces : liveTraces;
 
-  if (!sessionParams) {
-    return <p>Telemetry unavailable in live mode.</p>;
-  }
   if (!selectedDriver) {
     return <p>Select a driver to see telemetry.</p>;
   }
   if (!traces || !traces.speed || traces.speed.length === 0) {
-    return <p>Loading telemetry...</p>;
+    return <p>{sessionParams ? "Loading telemetry..." : "Waiting for live telemetry..."}</p>;
   }
 
   const speedMax = Math.max(...traces.speed, 1);

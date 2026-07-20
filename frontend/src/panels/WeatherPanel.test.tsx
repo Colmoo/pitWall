@@ -19,12 +19,12 @@ test("shows air/track temp, humidity, and wind", () => {
   expect(screen.getByText("2.7 km/h")).toBeInTheDocument();
 });
 
-test("shows unavailable message when there is no weather data (live mode)", () => {
+test("shows placeholder when there is no weather data yet", () => {
   render(<WeatherPanel state={{ ...stateWithWeather, weather: null }} />);
-  expect(screen.getByText(/unavailable in live mode/i)).toBeInTheDocument();
+  expect(screen.getByText(/no weather data yet/i)).toBeInTheDocument();
 });
 
-test("shows unavailable message when there is no session state yet", () => {
+test("shows placeholder when there is no session state yet", () => {
   render(<WeatherPanel state={null} />);
-  expect(screen.getByText(/unavailable in live mode/i)).toBeInTheDocument();
+  expect(screen.getByText(/no weather data yet/i)).toBeInTheDocument();
 });

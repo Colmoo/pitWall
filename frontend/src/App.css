@@ -329,6 +329,13 @@ body {
   text-transform: uppercase;
 }
 
+.pitwall-telemetry-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
 .pitwall-stat-value {
   font-family: "SF Mono", Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;

@@ -6,7 +6,7 @@ import pytest
 
 import fastf1
 
-from app.fastf1_adapter import attach_weather, attach_race_control_messages, list_events_for_year, list_sessions_for_event, list_supported_years, load_driver_lap_telemetry, load_session_states, session_states_from_laps, track_layout_from_telemetry
+from app.fastf1_adapter import attach_weather, attach_race_control_messages, list_events_for_year, list_sessions_for_event, list_supported_years, load_driver_lap_telemetry, load_session_states, session_states_from_laps, track_layout_from_telemetry, _synthesize_positions
 
 
 def _laps_df():
@@ -89,6 +89,43 @@ def test_session_states_from_laps_skips_nan_position():
     states = session_states_from_laps(laps, session_start)
     lap1_drivers = {d.abbreviation for d in states[0].drivers}
     assert lap1_drivers == {"VER"}
+
+
+def test_synthesize_positions_ranks_by_best_lap_time_so_far():
+    # Practice/Qualifying laps have no official Position (all-NaN) - VER is
+    # faster on lap 1 so leads, but HAM's lap 2 undercuts VER's best -> HAM
+    # takes over P1 from that point on.
+    laps, _ = _laps_df()
+    laps["Position"] = float("nan")
+    laps.loc[(laps["Driver"] == "HAM") & (laps["LapNumber"] == 2), "LapTime"] = timedelta(seconds=85.0)
+    positions = _synthesize_positions(laps)
+    ver_lap1_idx = laps[(laps["Driver"] == "VER") & (laps["LapNumber"] == 1)].index[0]
+    ham_lap1_idx = laps[(laps["Driver"] == "HAM") & (laps["LapNumber"] == 1)].index[0]
+    ham_lap2_idx = laps[(laps["Driver"] == "HAM") & (laps["LapNumber"] == 2)].index[0]
+    assert positions[ver_lap1_idx] == 1
+    assert positions[ham_lap1_idx] == 2
+    assert positions[ham_lap2_idx] == 1
+
+
+def test_load_session_states_falls_back_to_synthesized_positions(monkeypatch):
+    # Regression test for practice/qualifying sessions, where FastF1 never
+    # populates Position, so every lap used to get filtered out and the
+    # replay produced zero states.
+    laps, session_start = _laps_df()
+    laps["Position"] = float("nan")
+
+    class FakeSession:
+        def __init__(self):
+            self.laps = laps
+            self.date = pd.Timestamp(session_start)
+            self.weather_data = pd.DataFrame(columns=["Time", "AirTemp", "TrackTemp", "Humidity", "WindSpeed", "Rainfall"])
+            self.race_control_messages = pd.DataFrame(columns=["Time", "Category", "Message", "Flag"])
+            self.pos_data = {}
+
+    monkeypatch.setattr("app.fastf1_adapter.get_or_load_session", lambda *args, **kwargs: FakeSession())
+    states = load_session_states(year=2026, event="Test GP", session_type="FP1", cache_dir="/tmp")
+    assert len(states) == 4
+    assert all(d.position is not None for s in states for d in s.drivers)
 
 
 def test_session_states_from_laps_carries_forward_driver_skipped_from_early_state():
@@ -309,6 +346,35 @@ def test_load_driver_lap_telemetry_returns_empty_when_lap_not_found(monkeypatch)
 
     result = load_driver_lap_telemetry(
         year=2023, event="British Grand Prix", session_type="R", driver="99", lap_number=1, cache_dir="/tmp/x",
+    )
+    assert result == {"distance": [], "speed": [], "throttle": [], "brake": [], "gear": [], "rpm": []}
+
+
+def test_load_driver_lap_telemetry_returns_empty_when_car_data_not_loaded(monkeypatch):
+    # Regression test: very recent/in-progress sessions can have lap timing
+    # published before car telemetry is, which used to 500 the endpoint.
+    class FakeLapRow:
+        def get_car_data(self):
+            raise fastf1.core.DataNotLoadedError("car_data not loaded")
+
+    class FakeDriverLaps:
+        empty = False
+        iloc = [FakeLapRow()]
+
+    class FakeLaps:
+        def pick_drivers(self, driver):
+            return self
+
+        def pick_laps(self, lap_number):
+            return FakeDriverLaps()
+
+    class FakeSession:
+        laps = FakeLaps()
+
+    monkeypatch.setattr("app.fastf1_adapter.get_or_load_session", lambda **kwargs: FakeSession())
+
+    result = load_driver_lap_telemetry(
+        year=2026, event="Belgian Grand Prix", session_type="R", driver="30", lap_number=5, cache_dir="/tmp/x",
     )
     assert result == {"distance": [], "speed": [], "throttle": [], "brake": [], "gear": [], "rpm": []}
 
