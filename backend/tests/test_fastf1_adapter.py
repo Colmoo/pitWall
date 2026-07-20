@@ -6,7 +6,7 @@ import pytest
 
 import fastf1
 
-from app.fastf1_adapter import attach_weather, attach_race_control_messages, list_events_for_year, list_sessions_for_event, list_supported_years, load_driver_lap_telemetry, load_session_states, session_states_from_laps, track_layout_from_telemetry, _synthesize_positions
+from app.fastf1_adapter import attach_car_positions, attach_weather, attach_race_control_messages, list_events_for_year, list_sessions_for_event, list_supported_years, load_driver_lap_telemetry, load_session_states, load_track_layout, session_states_from_laps, track_layout_from_telemetry, _synthesize_positions
 
 
 def _laps_df():
@@ -220,6 +220,42 @@ def test_track_layout_from_telemetry_handles_fewer_points_than_requested():
     assert len(layout) == 3
 
 
+def test_track_layout_from_telemetry_appends_extra_columns():
+    telemetry = pd.DataFrame({"X": [0.0, 1.0], "Y": [0.0, 1.0], "Distance": [0.0, 12.5]})
+    layout = track_layout_from_telemetry(telemetry, num_points=2, extra_columns=["Distance"])
+    assert layout == [[0.0, 0.0, 0.0], [1.0, 1.0, 12.5]]
+
+
+def test_load_track_layout_includes_corners_and_sector_boundaries(monkeypatch):
+    telemetry = pd.DataFrame({"X": [0.0, 1.0, 2.0], "Y": [0.0, 1.0, 2.0], "Distance": [0.0, 100.0, 200.0]})
+
+    class FakeLap:
+        def get_telemetry(self):
+            return telemetry
+
+    class FakeLaps:
+        def pick_fastest(self):
+            return FakeLap()
+
+    class FakeCircuitInfo:
+        corners = pd.DataFrame([{"Number": 1, "X": 5.0, "Y": 5.0}, {"Number": 2, "X": 15.0, "Y": 15.0}])
+        marshal_sectors = pd.DataFrame([{"Number": 1, "Distance": 0.0}, {"Number": 2, "Distance": 150.0}, {"Number": 3, "Distance": 400.0}])
+
+    class FakeSession:
+        laps = FakeLaps()
+
+        def get_circuit_info(self):
+            return FakeCircuitInfo()
+
+    monkeypatch.setattr("app.fastf1_adapter.get_or_load_session", lambda *args, **kwargs: FakeSession())
+
+    layout = load_track_layout(year=2026, event="Suzuka", session_type="R", cache_dir="/tmp/x")
+
+    assert layout["points"] == [[0.0, 0.0, 0.0], [1.0, 1.0, 100.0], [2.0, 2.0, 200.0]]
+    assert layout["corners"] == [{"number": 1, "x": 5.0, "y": 5.0}, {"number": 2, "x": 15.0, "y": 15.0}]
+    assert layout["sector_boundaries"] == [0.0, 150.0, 400.0]
+
+
 def test_session_states_from_laps_computes_gap_to_leader_and_ahead():
     laps, session_start = _laps_df()
     states = session_states_from_laps(laps, session_start)
@@ -398,6 +434,48 @@ def test_load_session_states_degrades_to_no_positions_when_pos_data_not_loaded(m
 
     assert len(states) == 4
     assert all(driver.x is None and driver.y is None for state in states for driver in state.drivers)
+
+
+def test_attach_car_positions_inserts_ticks_between_lap_events_for_smooth_movement():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    assert len(states) == 4  # one per lap-completion event, ~90s apart
+
+    # VER position telemetry sampled every ~30s, moving in a straight line on X.
+    ver_pos = pd.DataFrame({
+        "Time": [timedelta(seconds=s) for s in range(0, 200, 30)],
+        "X": [float(s) for s in range(0, 200, 30)],
+        "Y": [0.0 for _ in range(0, 200, 30)],
+    })
+    ham_pos = pd.DataFrame({
+        "Time": [timedelta(seconds=s) for s in range(0, 200, 30)],
+        "X": [float(s) for s in range(0, 200, 30)],
+        "Y": [1.0 for _ in range(0, 200, 30)],
+    })
+    pos_data = {"1": ver_pos, "44": ham_pos}
+
+    expanded = attach_car_positions(states, pos_data, session_start, tick_seconds=1.0)
+
+    # ~90s between VER's two lap events => roughly that many 1s ticks inserted.
+    assert len(expanded) > len(states)
+    # every state (original and inserted) got a position for VER.
+    assert all(
+        any(d.driver_number == "1" and d.x is not None for d in s.drivers) for s in expanded
+    )
+    # timestamps are strictly increasing and evenly spaced by ~1s between originals.
+    timestamps = [pd.Timestamp(s.timestamp) for s in expanded]
+    assert timestamps == sorted(timestamps)
+    # inserted ticks carry forward the last lap-event's timing/gap data untouched.
+    mid = expanded[1]
+    assert mid.drivers[0].lap_number == states[0].drivers[0].lap_number
+
+
+def test_attach_car_positions_is_a_noop_when_pos_data_empty():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    result = attach_car_positions(states, {}, session_start)
+    assert result is states
+    assert len(result) == 4
 
 
 def test_list_supported_years_starts_at_2018_and_ends_at_current_year():

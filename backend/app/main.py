@@ -162,10 +162,9 @@ async def start_live(req: LiveRequest):
 
 @app.get("/session/track-layout")
 async def track_layout(year: int, event: str, session_type: str):
-    points = load_track_layout(
+    return load_track_layout(
         year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
     )
-    return {"points": points}
 
 
 @app.get("/session/telemetry")

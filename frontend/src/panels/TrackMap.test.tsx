@@ -84,6 +84,55 @@ test("shows the circuit name from sessionParams below the map", async () => {
   await waitFor(() => expect(screen.getByText("Silverstone")).toBeInTheDocument());
 });
 
+test("colors the outline by marshal sector when the layout includes distance and boundaries", async () => {
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      points: [[0, 0, 0], [10, 0, 10], [10, 10, 20], [0, 10, 30]],
+      corners: [{ number: 1, x: 5, y: 0 }],
+      sector_boundaries: [0, 15, 25],
+    }),
+  });
+
+  render(<TrackMap state={null} sessionParams={{ year: 2023, event: "Suzuka", sessionType: "R" }} />);
+
+  const outline = await waitFor(() => screen.getByTestId("track-outline"));
+  const paths = outline.querySelectorAll("path");
+  // 3 sectors present across the sampled points -> 3 distinctly-colored segments.
+  expect(paths.length).toBe(3);
+  expect(new Set(Array.from(paths).map((p) => p.getAttribute("stroke"))).size).toBe(3);
+  expect(screen.getByText("1")).toBeInTheDocument();
+});
+
+test("shows a name flag above the selected driver's dot", async () => {
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ points: [[0, 0], [10, 10]] }),
+  });
+
+  const state: SessionState = {
+    timestamp: "t1",
+    track_status: "green",
+    drivers: [
+      {
+        driver_number: "1", abbreviation: "VER", team: "Red Bull Racing", position: 1,
+        gap_to_leader: null, gap_to_ahead: null, last_lap_time: null, best_lap_time: null,
+        tire: { compound: "SOFT", age_laps: 1 }, x: 5, y: 5,
+        lap_number: 1, sector_1_time: null, sector_2_time: null, sector_3_time: null,
+        micro_sectors: [], flying_lap: null, speed: null, throttle: null, brake: null, gear: null, rpm: null, drs: null,
+      },
+    ],
+    weather: null,
+    race_control_messages: [],
+    team_radio: [],
+  };
+
+  render(<TrackMap state={state} sessionParams={{ year: 2023, event: "Silverstone", sessionType: "R" }} selectedDriver="1" />);
+
+  await waitFor(() => expect(screen.getByTestId("selected-driver-flag")).toBeInTheDocument());
+  expect(screen.getByTestId("selected-driver-flag")).toHaveTextContent("VER");
+});
+
 test("keeps the viewBox square for a non-square (wide) track so the bezel ring never clips", async () => {
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,

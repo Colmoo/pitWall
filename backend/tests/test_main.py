@@ -43,15 +43,17 @@ def test_replay_and_websocket_stream(monkeypatch):
 
 
 def test_track_layout_endpoint_returns_points(monkeypatch):
-    monkeypatch.setattr(
-        "app.main.load_track_layout",
-        lambda **kwargs: [[0.0, 0.0], [1.0, 2.0], [2.0, 4.0]],
-    )
+    layout = {
+        "points": [[0.0, 0.0, 0.0], [1.0, 2.0, 5.0], [2.0, 4.0, 10.0]],
+        "corners": [{"number": 1, "x": 1.0, "y": 2.0}],
+        "sector_boundaries": [3.3, 6.6],
+    }
+    monkeypatch.setattr("app.main.load_track_layout", lambda **kwargs: layout)
     resp = client.get("/session/track-layout", params={
         "year": 2026, "event": "Silverstone", "session_type": "R",
     })
     assert resp.status_code == 200
-    assert resp.json() == {"points": [[0.0, 0.0], [1.0, 2.0], [2.0, 4.0]]}
+    assert resp.json() == layout
 
 
 def test_live_endpoint_streams_states_over_websocket(monkeypatch):

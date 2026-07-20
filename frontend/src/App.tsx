@@ -146,7 +146,15 @@ export default function App() {
       id: "circuit",
       title: "Circuit",
       className: "pitwall-circuit-bezel",
-      node: <TrackMap state={latest} sessionParams={sessionParams} history={history} />,
+      node: (
+        <TrackMap
+          state={latest}
+          sessionParams={sessionParams}
+          history={history}
+          selectedDriver={selectedDriver}
+          onSelectDriver={setSelectedDriver}
+        />
+      ),
     },
     { id: "sector-times", title: "Sector Times", node: <SectorTimes state={latest} /> },
     { id: "gap-trend", title: "Gap Trend (to Leader)", node: <GapTrendChart history={history} selectedDriver={selectedDriver} /> },

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import fastf1
+import numpy as np
 import pandas as pd
 
 from app.schema import DriverState, RaceControlMessage, SessionState, Tire, TrackStatus, WeatherSnapshot
@@ -105,13 +106,16 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
     return states
 
 
-def track_layout_from_telemetry(telemetry: pd.DataFrame, num_points: int = 150) -> list[list[float]]:
+def track_layout_from_telemetry(
+    telemetry: pd.DataFrame, num_points: int = 150, extra_columns: list[str] | None = None
+) -> list[list[float]]:
     total = len(telemetry)
     if total == 0:
         return []
     step = max(1, total // num_points)
     sampled = telemetry.iloc[::step]
-    return [[float(row["X"]), float(row["Y"])] for _, row in sampled.iterrows()]
+    columns = ["X", "Y"] + (extra_columns or [])
+    return [[float(row[c]) for c in columns] for _, row in sampled.iterrows()]
 
 
 def nearest_weather_sample(weather_data: pd.DataFrame, elapsed) -> WeatherSnapshot | None:
@@ -134,19 +138,62 @@ def attach_weather(states: list[SessionState], weather_data: pd.DataFrame, sessi
         state.weather = nearest_weather_sample(weather_data, elapsed)
 
 
+def _nearest_position(driver_pos: "pd.DataFrame", elapsed: "pd.Timedelta") -> tuple[float, float] | None:
+    # driver_pos must already be sorted by Time. searchsorted is O(log n), so this
+    # stays cheap even called per-driver per-tick across a full session.
+    times = driver_pos["Time"].values
+    idx = int(np.searchsorted(times, pd.Timedelta(elapsed).to_timedelta64()))
+    if idx <= 0:
+        row = driver_pos.iloc[0]
+    elif idx >= len(driver_pos):
+        row = driver_pos.iloc[-1]
+    else:
+        before, after = driver_pos.iloc[idx - 1], driver_pos.iloc[idx]
+        row = before if (elapsed - before["Time"]) <= (after["Time"] - elapsed) else after
+    return float(row["X"]), float(row["Y"])
+
+
+def _attach_positions_at(state: SessionState, sorted_positions: dict[str, "pd.DataFrame"], elapsed: "pd.Timedelta") -> None:
+    for driver in state.drivers:
+        driver_pos = sorted_positions.get(driver.driver_number)
+        if driver_pos is None:
+            continue
+        driver.x, driver.y = _nearest_position(driver_pos, elapsed)
+
+
+# Lap-completion events (session_states_from_laps) only fire every ~90s per
+# driver, which made the map's dots visibly teleport/freeze between laps
+# instead of moving smoothly. This inserts intermediate ticks between each
+# pair of lap-completion states, carrying the last-known timing/gap/tire
+# snapshot forward but refreshing x/y from the much higher-frequency FastF1
+# position telemetry - so the dots glide instead of jumping once a lap.
 def attach_car_positions(
-    states: list[SessionState], pos_data: dict[str, "pd.DataFrame"], session_start: datetime
-) -> None:
-    for state in states:
-        elapsed = state.timestamp - session_start
-        for driver in state.drivers:
-            driver_pos = pos_data.get(driver.driver_number)
-            if driver_pos is None or driver_pos.empty:
-                continue
-            idx = (driver_pos["Time"] - elapsed).abs().idxmin()
-            row = driver_pos.loc[idx]
-            driver.x = float(row["X"])
-            driver.y = float(row["Y"])
+    states: list[SessionState],
+    pos_data: dict[str, "pd.DataFrame"],
+    session_start: datetime,
+    tick_seconds: float = 1.0,
+) -> list[SessionState]:
+    sorted_positions = {number: df.sort_values("Time") for number, df in pos_data.items() if not df.empty}
+    if not states or not sorted_positions:
+        return states
+
+    step = pd.Timedelta(seconds=tick_seconds)
+    expanded: list[SessionState] = []
+    for i, state in enumerate(states):
+        elapsed = pd.Timestamp(state.timestamp) - pd.Timestamp(session_start)
+        _attach_positions_at(state, sorted_positions, elapsed)
+        expanded.append(state)
+        if i + 1 >= len(states):
+            break
+        next_elapsed = pd.Timestamp(states[i + 1].timestamp) - pd.Timestamp(session_start)
+        tick = elapsed + step
+        while tick < next_elapsed:
+            snapshot = state.model_copy(deep=True)
+            snapshot.timestamp = session_start + tick
+            _attach_positions_at(snapshot, sorted_positions, tick)
+            expanded.append(snapshot)
+            tick += step
+    return expanded
 
 
 def race_control_messages_up_to(rcm: pd.DataFrame, timestamp: datetime) -> list[RaceControlMessage]:
@@ -180,7 +227,42 @@ def get_or_load_session(year: int, event: str, session_type: str, cache_dir: str
     return _session_cache[key]
 
 
-def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) -> list[list[float]]:
+# FastF1's DRS channel: 0/1 closed, 8 detected-but-not-open, 10/12/14 open.
+# >=10 is the documented "open" threshold used across other F1 live-timing tooling.
+_DRS_OPEN_MIN_VALUE = 10
+# Ignore DRS blips shorter than this - a real zone spans hundreds of metres;
+# anything shorter is channel noise around the open/close edge.
+_DRS_ZONE_MIN_METERS = 50
+
+
+def _drs_zones_from_telemetry(telemetry: pd.DataFrame) -> list[dict]:
+    if "DRS" not in telemetry.columns or telemetry.empty:
+        return []
+    is_open = (telemetry["DRS"] >= _DRS_OPEN_MIN_VALUE).tolist()
+    index_spans: list[tuple[int, int]] = []
+    start: int | None = None
+    for i, open_now in enumerate(is_open):
+        if open_now and start is None:
+            start = i
+        elif not open_now and start is not None:
+            index_spans.append((start, i - 1))
+            start = None
+    if start is not None:
+        index_spans.append((start, len(telemetry) - 1))
+
+    zones = []
+    for start_idx, end_idx in index_spans:
+        start_row, end_row = telemetry.iloc[start_idx], telemetry.iloc[end_idx]
+        if "Distance" in telemetry.columns and (end_row["Distance"] - start_row["Distance"]) < _DRS_ZONE_MIN_METERS:
+            continue
+        zones.append({
+            "start_x": float(start_row["X"]), "start_y": float(start_row["Y"]),
+            "end_x": float(end_row["X"]), "end_y": float(end_row["Y"]),
+        })
+    return zones
+
+
+def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) -> dict:
     session = get_or_load_session(year, event, session_type, cache_dir)
     fastest_lap = session.laps.pick_fastest()
     try:
@@ -188,8 +270,27 @@ def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) 
     except KeyError:
         # Some older/incomplete sessions (e.g. 2018 Australian GP) have no car
         # position telemetry at all - degrade to an empty layout rather than 500.
-        return []
-    return track_layout_from_telemetry(telemetry)
+        return {"points": [], "corners": [], "sector_boundaries": [], "drs_zones": []}
+
+    # points carry Distance-along-lap as a 3rd value so the frontend can color
+    # each segment by marshal sector, like an official circuit poster.
+    points = track_layout_from_telemetry(telemetry, extra_columns=["Distance"])
+
+    corners: list[dict] = []
+    sector_boundaries: list[float] = []
+    circuit_info = session.get_circuit_info()
+    if circuit_info is not None:
+        corners = [
+            {"number": int(row["Number"]), "x": float(row["X"]), "y": float(row["Y"])}
+            for _, row in circuit_info.corners.iterrows()
+        ]
+        sector_boundaries = sorted(float(d) for d in circuit_info.marshal_sectors["Distance"].tolist())
+
+    # DRS zone geometry isn't published by FastF1 - approximate it from where the
+    # fastest lap's DRS channel was actually open, rather than fabricating zones.
+    drs_zones = _drs_zones_from_telemetry(telemetry)
+
+    return {"points": points, "corners": corners, "sector_boundaries": sector_boundaries, "drs_zones": drs_zones}
 
 
 # ponytail: 2018 is the earliest season FastF1's lap-by-lap timing data is
@@ -266,5 +367,5 @@ def load_session_states(year: int, event: str, session_type: str, cache_dir: str
         # Some sessions (e.g. older/incomplete ones) have no car position
         # telemetry at all - degrade to no positions rather than 500.
         pos_data = {}
-    attach_car_positions(states, pos_data, session_start)
+    states = attach_car_positions(states, pos_data, session_start)
     return states
