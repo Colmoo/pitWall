@@ -244,7 +244,10 @@ def test_load_track_layout_includes_corners_and_sector_boundaries(monkeypatch):
             return FakeLap()
 
     class FakeCircuitInfo:
-        corners = pd.DataFrame([{"Number": 1, "X": 5.0, "Y": 5.0}, {"Number": 2, "X": 15.0, "Y": 15.0}])
+        corners = pd.DataFrame([
+            {"Number": 1, "X": 5.0, "Y": 5.0, "Angle": 90.0},
+            {"Number": 2, "X": 15.0, "Y": 15.0, "Angle": 180.0},
+        ])
         marshal_sectors = pd.DataFrame([{"Number": 1, "Distance": 0.0}, {"Number": 2, "Distance": 90.0}, {"Number": 3, "Distance": 150.0}])
 
     class FakeSession:
@@ -258,7 +261,10 @@ def test_load_track_layout_includes_corners_and_sector_boundaries(monkeypatch):
     layout = load_track_layout(year=2026, event="Suzuka", session_type="R", cache_dir="/tmp/x")
 
     assert layout["points"] == [[0.0, 0.0, 0.0], [1.0, 1.0, 100.0], [2.0, 2.0, 200.0]]
-    assert layout["corners"] == [{"number": 1, "x": 5.0, "y": 5.0}, {"number": 2, "x": 15.0, "y": 15.0}]
+    assert layout["corners"] == [
+        {"number": 1, "x": 5.0, "y": 5.0, "angle": 90.0},
+        {"number": 2, "x": 15.0, "y": 15.0, "angle": 180.0},
+    ]
     # 30% and 70% of the fastest lap's total distance (200) - splits it into
     # exactly 3 real timing sectors, not FastF1's much finer marshal sectors.
     assert layout["sector_boundaries"] == [60.0, 140.0]

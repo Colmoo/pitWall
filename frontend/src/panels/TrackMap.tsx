@@ -13,7 +13,7 @@ const DEFAULT_VIEW: View = { panX: 0, panY: 0, scale: 1 };
 // [x, y] or [x, y, distanceAlongLap] - distance is only present in replay mode
 // (from FastF1 telemetry) and drives the per-sector coloring below.
 type LayoutPoint = number[];
-type Corner = { number: number; x: number; y: number };
+type Corner = { number: number; x: number; y: number; angle: number };
 type DrsZone = { start_x: number; start_y: number; end_x: number; end_y: number };
 
 // Which boundary set colors the outline: no division, the 3 real timing
@@ -29,10 +29,13 @@ const MAP_LAYERS: { id: MapLayer; label: string }[] = [
 // posters - cycles for layers with more than 3 boundaries (micro sectors).
 const SECTOR_COLORS = ["#e10600", "#3ecbff", "#ffd400"];
 
+// `boundaries` are the distances where the lap moves into the next sector -
+// e.g. [b1, b2] for a 3-way split means: index 0 below b1, 1 from b1 to b2,
+// 2 from b2 on. Each boundary crossed bumps the index by one.
 function sectorIndex(distance: number, boundaries: number[]): number {
   let index = 0;
-  for (let i = 1; i < boundaries.length; i++) {
-    if (distance >= boundaries[i]) index = i;
+  for (let i = 0; i < boundaries.length; i++) {
+    if (distance >= boundaries[i]) index = i + 1;
   }
   return index % SECTOR_COLORS.length;
 }
@@ -294,6 +297,16 @@ export function TrackMap({
   const segments = buildSectorSegments(points, activeBoundaries);
   const roadPoints = [...points, points[0]];
 
+  // Corner numbers sit on the racing line itself unless nudged outward - each
+  // corner's own Angle (FastF1 circuit info) points in the direction that
+  // reads as "outside the turn", per FastF1's own offset-marker convention.
+  const cornerLabelOffset = width * 0.03;
+  const cornerMarkers = rotatedCorners.map((c) => {
+    const angleRad = (c.angle * Math.PI) / 180 + (rotate ? Math.PI / 2 : 0);
+    const [ox, oy] = [c.x + Math.cos(angleRad) * cornerLabelOffset, c.y + Math.sin(angleRad) * cornerLabelOffset];
+    return { ...c, labelX: ox, labelY: oy };
+  });
+
   const drsOverlays = rotatedDrsZones.map((z) => {
     const startIdx = nearestIndex(points, z.start_x, z.start_y);
     const endIdx = nearestIndex(points, z.end_x, z.end_y);
@@ -388,10 +401,10 @@ export function TrackMap({
             {overlay[0] && <circle cx={overlay[0][0]} cy={overlay[0][1]} r={width * 0.009} fill="#22c55e" />}
           </g>
         ))}
-        {rotatedCorners.map((c) => (
+        {cornerMarkers.map((c) => (
           <g key={c.number}>
-            <circle cx={c.x} cy={c.y} r={width * 0.012} fill="#e5e7eb" stroke="#0a0c10" strokeWidth={width * 0.0018} />
-            <text x={c.x} y={c.y} fontSize={width * 0.013} fontWeight="bold" fill="#0a0c10" textAnchor="middle" dominantBaseline="central">
+            <circle cx={c.labelX} cy={c.labelY} r={width * 0.012} fill="#e5e7eb" stroke="#0a0c10" strokeWidth={width * 0.0018} />
+            <text x={c.labelX} y={c.labelY} fontSize={width * 0.013} fontWeight="bold" fill="#0a0c10" textAnchor="middle" dominantBaseline="central">
               {c.number}
             </text>
           </g>

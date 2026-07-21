@@ -285,7 +285,10 @@ def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) 
     circuit_info = session.get_circuit_info()
     if circuit_info is not None:
         corners = [
-            {"number": int(row["Number"]), "x": float(row["X"]), "y": float(row["Y"])}
+            # Angle points in the direction FastF1 itself recommends offsetting
+            # a corner's label toward, so the number sits outside the turn
+            # instead of directly on the racing line.
+            {"number": int(row["Number"]), "x": float(row["X"]), "y": float(row["Y"]), "angle": float(row["Angle"])}
             for _, row in circuit_info.corners.iterrows()
         ]
         micro_sector_boundaries = sorted(float(d) for d in circuit_info.marshal_sectors["Distance"].tolist())

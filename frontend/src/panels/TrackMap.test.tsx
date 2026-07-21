@@ -91,7 +91,7 @@ test("colors the outline by marshal sector when the layout includes distance and
     ok: true,
     json: async () => ({
       points: [[0, 0, 0], [10, 0, 10], [10, 10, 20], [0, 10, 30]],
-      corners: [{ number: 1, x: 5, y: 0 }],
+      corners: [{ number: 1, x: 5, y: 0, angle: 90 }],
       sector_boundaries: [0, 15, 25],
     }),
   });
@@ -104,7 +104,32 @@ test("colors the outline by marshal sector when the layout includes distance and
   // distinctly-colored centerline segments on top of it.
   expect(paths.length).toBe(4);
   expect(new Set(Array.from(paths).map((p) => p.getAttribute("stroke"))).size).toBe(4);
-  expect(screen.getByText("1")).toBeInTheDocument();
+  const label = screen.getByText("1");
+  expect(label).toBeInTheDocument();
+  // corner sits at (5, 0) with Angle=90 - the label is nudged off that point
+  // along the angle, not stacked directly on top of the racing line.
+  expect(label.getAttribute("y")).not.toBe("0");
+});
+
+test("splits the outline into all 3 real sectors from exactly 2 boundaries", async () => {
+  // regression test: with only [b1, b2] (the real S1/S2/S3 shape - 2
+  // boundaries for 3 sectors), the first boundary used to never be checked,
+  // so distances below b2 all fell into a single sector and only 2 colors
+  // ever appeared instead of 3.
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      points: [[0, 0, 0], [10, 0, 10], [10, 10, 20], [0, 10, 30]],
+      sector_boundaries: [10, 20],
+    }),
+  });
+
+  render(<TrackMap state={null} sessionParams={{ year: 2023, event: "Suzuka", sessionType: "R" }} />);
+
+  const outline = await waitFor(() => screen.getByTestId("track-outline"));
+  const paths = outline.querySelectorAll("path");
+  expect(paths.length).toBe(4); // 1 road + 3 distinctly-colored sector segments
+  expect(new Set(Array.from(paths).map((p) => p.getAttribute("stroke"))).size).toBe(4);
 });
 
 test("map layer picker switches between blank, sectors, and micro sectors", async () => {
