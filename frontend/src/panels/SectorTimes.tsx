@@ -21,6 +21,33 @@ function microSectorClass(status: string): string {
   return "gray";
 }
 
+function SectorCell({
+  time,
+  microSectors,
+  isBest,
+  testId,
+}: {
+  time: number | null;
+  microSectors: string[];
+  isBest: boolean;
+  testId: string;
+}) {
+  return (
+    <td
+      className="pitwall-sector-cell"
+      data-testid={isBest ? testId : undefined}
+      style={isBest ? { color: "purple" } : undefined}
+    >
+      {time?.toFixed(3) ?? "-"}
+      <span className="pitwall-micro-sectors" data-testid={`${testId}-micro`}>
+        {microSectors.map((s, i) => (
+          <span key={i} className={`pitwall-micro-sector ${microSectorClass(s)}`} />
+        ))}
+      </span>
+    </td>
+  );
+}
+
 export function SectorTimes({ state }: { state: SessionState | null }) {
   if (!state) {
     return <p>Waiting for session data...</p>;
@@ -31,39 +58,32 @@ export function SectorTimes({ state }: { state: SessionState | null }) {
   const bestS3 = bestDriverNumber(state.drivers, "sector_3_time");
 
   return (
-    <table>
+    <table className="pitwall-sector-table">
       <thead>
-        <tr><th>Driver</th><th>S1</th><th>S2</th><th>S3</th><th>Mini Sectors</th></tr>
+        <tr><th>Driver</th><th>S1</th><th>S2</th><th>S3</th></tr>
       </thead>
       <tbody>
         {state.drivers.map((d) => (
           <tr key={d.driver_number}>
             <td>{d.abbreviation}</td>
-            <td
-              data-testid={d.driver_number === bestS1 ? `sector1-best-${d.driver_number}` : undefined}
-              style={d.driver_number === bestS1 ? { color: "purple" } : undefined}
-            >
-              {d.sector_1_time?.toFixed(3) ?? "-"}
-            </td>
-            <td
-              data-testid={d.driver_number === bestS2 ? `sector2-best-${d.driver_number}` : undefined}
-              style={d.driver_number === bestS2 ? { color: "purple" } : undefined}
-            >
-              {d.sector_2_time?.toFixed(3) ?? "-"}
-            </td>
-            <td
-              data-testid={d.driver_number === bestS3 ? `sector3-best-${d.driver_number}` : undefined}
-              style={d.driver_number === bestS3 ? { color: "purple" } : undefined}
-            >
-              {d.sector_3_time?.toFixed(3) ?? "-"}
-            </td>
-            <td>
-              <span className="pitwall-micro-sectors" data-testid={`micro-sectors-${d.driver_number}`}>
-                {d.micro_sectors.map((s, i) => (
-                  <span key={i} className={`pitwall-micro-sector ${microSectorClass(s)}`} />
-                ))}
-              </span>
-            </td>
+            <SectorCell
+              time={d.sector_1_time}
+              microSectors={d.micro_sectors[0] ?? []}
+              isBest={d.driver_number === bestS1}
+              testId={`sector1-best-${d.driver_number}`}
+            />
+            <SectorCell
+              time={d.sector_2_time}
+              microSectors={d.micro_sectors[1] ?? []}
+              isBest={d.driver_number === bestS2}
+              testId={`sector2-best-${d.driver_number}`}
+            />
+            <SectorCell
+              time={d.sector_3_time}
+              microSectors={d.micro_sectors[2] ?? []}
+              isBest={d.driver_number === bestS3}
+              testId={`sector3-best-${d.driver_number}`}
+            />
           </tr>
         ))}
       </tbody>

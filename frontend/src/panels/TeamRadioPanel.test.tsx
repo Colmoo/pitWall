@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { TeamRadioPanel } from "./TeamRadioPanel";
 import type { SessionState } from "../types";
@@ -44,7 +44,79 @@ test("lists clips most-recent first with the driver's abbreviation and an audio 
   expect(rows).toHaveLength(2);
   expect(rows[0]).toHaveTextContent("HAM");
   expect(rows[1]).toHaveTextContent("VER");
-  const audios = document.querySelectorAll("audio");
+  const audios = document.querySelectorAll(".pitwall-radio-row audio");
   expect(audios).toHaveLength(2);
   expect(audios[0]).toHaveAttribute("src", "https://example.com/b.mp3");
+});
+
+function autoplayer() {
+  return document.querySelector('[data-testid="radio-autoplay-player"]') as HTMLAudioElement;
+}
+
+test("always autoplays the selected driver's radio, even with autoplay switched off", () => {
+  const state = baseState({ team_radio: [] });
+  const { rerender } = render(<TeamRadioPanel state={state} selectedDriver="1" />);
+
+  fireEvent.click(screen.getByLabelText("Autoplay radio"));
+
+  const withClip = baseState({
+    team_radio: [{ timestamp: "t1", driver_number: "1", url: "https://example.com/ver.mp3" }],
+  });
+  rerender(<TeamRadioPanel state={withClip} selectedDriver="1" />);
+
+  expect(autoplayer()).toHaveAttribute("src", "https://example.com/ver.mp3");
+});
+
+test("does not autoplay an unfollowed, unselected driver's radio", () => {
+  const state = baseState({ team_radio: [] });
+  const { rerender } = render(<TeamRadioPanel state={state} selectedDriver="1" />);
+
+  const withClip = baseState({
+    team_radio: [{ timestamp: "t1", driver_number: "44", url: "https://example.com/ham.mp3" }],
+  });
+  rerender(<TeamRadioPanel state={withClip} selectedDriver="1" />);
+
+  expect(autoplayer()).not.toHaveAttribute("src");
+});
+
+test("autoplays a followed driver's radio when the switch is on", () => {
+  const state = baseState({ team_radio: [] });
+  const { rerender } = render(<TeamRadioPanel state={state} selectedDriver={null} />);
+
+  fireEvent.click(screen.getByLabelText("HAM"));
+
+  const withClip = baseState({
+    team_radio: [{ timestamp: "t1", driver_number: "44", url: "https://example.com/ham.mp3" }],
+  });
+  rerender(<TeamRadioPanel state={withClip} selectedDriver={null} />);
+
+  expect(autoplayer()).toHaveAttribute("src", "https://example.com/ham.mp3");
+});
+
+test("prioritizes the clip from the higher-placed driver when several arrive at once", () => {
+  const state = baseState({
+    drivers: [
+      { ...driver("1", "VER"), position: 3 },
+      { ...driver("44", "HAM"), position: 1 },
+    ],
+    team_radio: [],
+  });
+  const { rerender } = render(<TeamRadioPanel state={state} selectedDriver={null} />);
+
+  fireEvent.click(screen.getByLabelText("VER"));
+  fireEvent.click(screen.getByLabelText("HAM"));
+
+  const withClips = baseState({
+    drivers: state.drivers,
+    team_radio: [
+      { timestamp: "t1", driver_number: "1", url: "https://example.com/ver.mp3" },
+      { timestamp: "t1", driver_number: "44", url: "https://example.com/ham.mp3" },
+    ],
+  });
+  rerender(<TeamRadioPanel state={withClips} selectedDriver={null} />);
+
+  expect(autoplayer()).toHaveAttribute("src", "https://example.com/ham.mp3");
+
+  fireEvent.ended(autoplayer());
+  expect(autoplayer()).toHaveAttribute("src", "https://example.com/ver.mp3");
 });

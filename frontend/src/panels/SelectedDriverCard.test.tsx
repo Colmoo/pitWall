@@ -55,3 +55,17 @@ test("shows a placeholder when there is no session state yet", () => {
   render(<SelectedDriverCard state={null} selectedDriver="1" />);
   expect(screen.getByText(/select a driver/i)).toBeInTheDocument();
 });
+
+test("shows only the selected driver's team radio clips", () => {
+  const stateWithRadio: SessionState = {
+    ...sampleState,
+    team_radio: [
+      { driver_number: "1", timestamp: "t1", url: "http://example.com/ver.mp3" },
+      { driver_number: "44", timestamp: "t2", url: "http://example.com/ham.mp3" },
+    ],
+  };
+  render(<SelectedDriverCard state={stateWithRadio} selectedDriver="44" />);
+  const clips = screen.getByTestId("selected-driver-radio");
+  expect(clips.querySelectorAll("audio")).toHaveLength(1);
+  expect(clips.querySelector("audio")).toHaveAttribute("src", "http://example.com/ham.mp3");
+});

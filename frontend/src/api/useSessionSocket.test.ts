@@ -1,6 +1,14 @@
 import { renderHook, act } from "@testing-library/react";
 import { useSessionSocket } from "./useSessionSocket";
 
+// Batching flushes on requestAnimationFrame; run it synchronously in tests
+// so existing act()-wrapped assertions don't need to await a real frame.
+global.requestAnimationFrame = ((cb: FrameRequestCallback) => {
+  cb(0);
+  return 0;
+}) as typeof requestAnimationFrame;
+global.cancelAnimationFrame = (() => {}) as typeof cancelAnimationFrame;
+
 class FakeWebSocket {
   static instances: FakeWebSocket[] = [];
   onmessage: ((ev: { data: string }) => void) | null = null;

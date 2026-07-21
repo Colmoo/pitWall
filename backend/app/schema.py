@@ -54,8 +54,9 @@ class DriverState(BaseModel):
     sector_1_time: float | None = None
     sector_2_time: float | None = None
     sector_3_time: float | None = None
-    # per-segment mini-sector status ("purple"/"green"/"yellow"/"none"), in track order
-    micro_sectors: list[str] = []
+    # per-segment mini-sector status ("purple"/"green"/"yellow"/"none"), grouped by
+    # macro sector: micro_sectors[0] = S1's segments, [1] = S2's, [2] = S3's
+    micro_sectors: list[list[str]] = []
     # True = on a push/flying lap, False = out-lap or in-lap (box), None = unknown
     flying_lap: bool | None = None
     # live car-data channel readout - only populated in live mode (no historical

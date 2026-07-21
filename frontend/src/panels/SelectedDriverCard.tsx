@@ -14,6 +14,10 @@ export function SelectedDriverCard({
     return <p>Select a driver to see details.</p>;
   }
 
+  const radioClips = (state?.team_radio ?? [])
+    .filter((clip) => clip.driver_number === selectedDriver)
+    .reverse();
+
   return (
     <div>
       <div className="pitwall-stat">
@@ -75,6 +79,20 @@ export function SelectedDriverCard({
             <div className={`pitwall-stat-value ${driver.drs ? "cyan" : ""}`}>{driver.drs ? "OPEN" : "CLOSED"}</div>
           </div>
         </div>
+      )}
+      <div className="pitwall-stat">
+        <div className="pitwall-stat-label">Team Radio</div>
+      </div>
+      {radioClips.length === 0 ? (
+        <p>No team radio yet.</p>
+      ) : (
+        <ul className="pitwall-radio-list" data-testid="selected-driver-radio">
+          {radioClips.map((clip, i) => (
+            <li key={`${clip.timestamp}-${i}`} className="pitwall-radio-row">
+              <audio controls src={clip.url} />
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

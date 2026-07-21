@@ -105,13 +105,15 @@ def _parse_race_control_messages(tree: dict) -> list[RaceControlMessage]:
     return messages
 
 
-def _parse_micro_sectors(sectors: list) -> list[str]:
-    segments: list[str] = []
+def _parse_micro_sectors(sectors: list) -> list[list[str]]:
+    grouped: list[list[str]] = []
     for sector in sectors:
-        for segment in sector.get("Segments", []) if isinstance(sector, dict) else []:
-            code = segment.get("Status") if isinstance(segment, dict) else None
-            segments.append(_SEGMENT_STATUS_CODES.get(code, "none"))
-    return segments
+        segments = sector.get("Segments", []) if isinstance(sector, dict) else []
+        grouped.append([
+            _SEGMENT_STATUS_CODES.get(segment.get("Status") if isinstance(segment, dict) else None, "none")
+            for segment in segments
+        ])
+    return grouped
 
 
 def _parse_flying_lap(timing: dict) -> bool | None:

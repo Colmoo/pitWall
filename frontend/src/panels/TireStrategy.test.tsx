@@ -46,3 +46,19 @@ test("colors each stint segment by tire compound", () => {
   const segment = screen.getByTestId("stint-1-SOFT-1-2");
   expect(segment).toHaveStyle({ background: "#e10600" });
 });
+
+test("shows the start and end lap on each stint", () => {
+  const history = [driverTick(1, "SOFT"), driverTick(2, "SOFT"), driverTick(3, "MEDIUM")];
+  render(<TireStrategy history={history} />);
+  expect(screen.getByTestId("stint-1-SOFT-1-2")).toHaveTextContent("1-2");
+  expect(screen.getByTestId("stint-1-MEDIUM-3-3")).toHaveTextContent("3");
+});
+
+test("shows a distinct background for laps not yet run by a driver", () => {
+  const laggingDriver = { ...driverTick(1, "SOFT").drivers[0], driver_number: "44" };
+  const history = [
+    { ...driverTick(3, "SOFT"), drivers: [...driverTick(3, "SOFT").drivers, laggingDriver] },
+  ];
+  render(<TireStrategy history={history} />);
+  expect(document.querySelector(".pitwall-tire-remaining")).toBeInTheDocument();
+});

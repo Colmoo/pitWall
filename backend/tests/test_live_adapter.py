@@ -190,7 +190,7 @@ def test_session_state_from_live_tree_parses_micro_sectors():
     ]
     state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
     ver = next(d for d in state.drivers if d.abbreviation == "VER")
-    assert ver.micro_sectors == ["green", "yellow", "purple", "none"]
+    assert ver.micro_sectors == [["green", "yellow"], ["purple"], ["none"]]
 
 
 def test_session_state_from_live_tree_flying_lap_false_when_in_pit():

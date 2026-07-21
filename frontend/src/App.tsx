@@ -65,7 +65,11 @@ const AI_NOTES_WS_URL = import.meta.env.VITE_BACKEND_AI_NOTES_WS_URL ?? "ws://lo
 export default function App() {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [sessionParams, setSessionParams] = useState<{ year: number; event: string; sessionType: string } | null>(null);
-  const history = useSessionSocket(WS_URL, sessionParams);
+  // Bumped on every session start (including back-to-back live sessions, where
+  // sessionParams stays null) so the socket reconnects and history/team-radio
+  // from the previous session don't bleed into the new one.
+  const [sessionGeneration, setSessionGeneration] = useState(0);
+  const history = useSessionSocket(WS_URL, sessionGeneration);
   const latest = history.length > 0 ? history[history.length - 1] : null;
   const notes = useAiNotes(AI_NOTES_WS_URL);
 
@@ -123,8 +127,12 @@ export default function App() {
         onReplayStarted={(params) => {
           setSessionParams(params);
           setSessionStarted(true);
+          setSessionGeneration((g) => g + 1);
         }}
-        onLiveStarted={() => setSessionStarted(true)}
+        onLiveStarted={() => {
+          setSessionStarted(true);
+          setSessionGeneration((g) => g + 1);
+        }}
       />
     );
   }
@@ -166,7 +174,7 @@ export default function App() {
       node: <TelemetryStack sessionParams={sessionParams} state={latest} history={history} selectedDriver={selectedDriver} />,
     },
     { id: "weather", title: "Weather", node: <WeatherPanel state={latest} /> },
-    { id: "team-radio", title: "Team Radio", node: <TeamRadioPanel state={latest} /> },
+    { id: "team-radio", title: "Team Radio", node: <TeamRadioPanel state={latest} selectedDriver={selectedDriver} /> },
     { id: "race-engineer-notes", title: "Race Engineer Notes", node: <RaceEngineerNotes notes={notes} /> },
     { id: "ai-chat", title: "Ask The Engineer", node: <AiChat /> },
   ];

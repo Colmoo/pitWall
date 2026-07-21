@@ -171,7 +171,7 @@ def attach_car_positions(
     states: list[SessionState],
     pos_data: dict[str, "pd.DataFrame"],
     session_start: datetime,
-    tick_seconds: float = 1.0,
+    tick_seconds: float = 3.0,
 ) -> list[SessionState]:
     sorted_positions = {number: df.sort_values("Time") for number, df in pos_data.items() if not df.empty}
     if not states or not sorted_positions:

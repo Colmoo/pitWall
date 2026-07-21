@@ -9,7 +9,7 @@ function driver(
   s1: number,
   s2: number,
   s3: number,
-  microSectors: string[] = [],
+  microSectors: string[][] = [],
 ): SessionState["drivers"][number] {
   return {
     driver_number: num, abbreviation: abbr, team: "Team", position: 1,
@@ -50,17 +50,21 @@ test("shows a placeholder when there is no state yet", () => {
   expect(screen.getByText(/waiting for session data/i)).toBeInTheDocument();
 });
 
-test("renders one block per micro sector, colored by status", () => {
+test("renders one block per micro sector under its own sector column, colored by status", () => {
   const state: SessionState = {
     timestamp: "t1", track_status: "green",
-    drivers: [driver("1", "VER", 28.0, 32.0, 31.0, ["purple", "green", "yellow", "none"])],
+    drivers: [driver("1", "VER", 28.0, 32.0, 31.0, [["purple", "green"], ["yellow"], ["none"]])],
     weather: null,
     race_control_messages: [],
     team_radio: [],
   };
   render(<SectorTimes state={state} />);
-  const blocks = screen.getByTestId("micro-sectors-1").children;
-  expect(blocks).toHaveLength(4);
-  expect(blocks[0]).toHaveClass("purple");
-  expect(blocks[3]).toHaveClass("gray");
+  const s1Blocks = screen.getByTestId("sector1-best-1-micro").children;
+  expect(s1Blocks).toHaveLength(2);
+  expect(s1Blocks[0]).toHaveClass("purple");
+  expect(s1Blocks[1]).toHaveClass("green");
+
+  const s3Blocks = screen.getByTestId("sector3-best-1-micro").children;
+  expect(s3Blocks).toHaveLength(1);
+  expect(s3Blocks[0]).toHaveClass("gray");
 });
