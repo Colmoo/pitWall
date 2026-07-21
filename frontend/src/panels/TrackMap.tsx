@@ -76,6 +76,7 @@ export function TrackMap({
   const [drsZones, setDrsZones] = useState<DrsZone[]>([]);
   const [view, setView] = useState<View>(DEFAULT_VIEW);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
 
 type TrackLayoutResponse = { points: LayoutPoint[]; corners?: Corner[]; sector_boundaries?: number[]; drs_zones?: DrsZone[] };
 
@@ -137,6 +138,23 @@ useEffect(() => {
 
   const points = sessionParams ? fetchedPoints : tracedPoints;
 
+  // React's onWheel is attached as a passive listener, so preventDefault()
+  // inside it silently no-ops and the page scrolls/zooms along with the map.
+  // A native listener registered with {passive: false} actually blocks that.
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    function handleWheel(e: WheelEvent) {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      setView((v) => ({ ...v, scale: Math.min(8, Math.max(0.5, v.scale * factor)) }));
+    }
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+    // re-attach once the svg actually mounts (it doesn't exist yet while the
+    // "loading"/"tracing" placeholder below is showing instead).
+  }, [points.length >= 2]);
+
   if (points.length < 2) {
     return <p>{sessionParams ? "Loading track layout..." : "Tracing track from live car positions..."}</p>;
   }
@@ -165,12 +183,6 @@ useEffect(() => {
   const scaledSize = viewSize / view.scale;
   const vbX = centerX - scaledSize / 2 + view.panX;
   const vbY = centerY - scaledSize / 2 + view.panY;
-
-  function handleWheel(e: React.WheelEvent<SVGSVGElement>) {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-    setView((v) => ({ ...v, scale: Math.min(8, Math.max(0.5, v.scale * factor)) }));
-  }
 
   function handlePointerDown(e: React.PointerEvent<SVGSVGElement>) {
     dragRef.current = { x: e.clientX, y: e.clientY };
@@ -202,9 +214,9 @@ useEffect(() => {
           Reset view
         </button>
         <svg
+          ref={svgRef}
           viewBox={`${vbX} ${vbY} ${scaledSize} ${scaledSize}`}
-          style={{ width: "100%", height: "auto", background: "#05070a", cursor: dragRef.current ? "grabbing" : "grab", touchAction: "none" }}
-          onWheel={handleWheel}
+          style={{ width: "100%", height: "auto", background: "#ffffff", cursor: dragRef.current ? "grabbing" : "grab", touchAction: "none" }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
@@ -215,7 +227,7 @@ useEffect(() => {
           cy={centerY}
           r={size / 2 + padding * 0.6}
           fill="none"
-          stroke="#1a1d1f"
+          stroke="#e2e8f0"
           strokeWidth={width * 0.003}
         />
         <g data-testid="track-outline">
@@ -239,8 +251,8 @@ useEffect(() => {
         ))}
         {corners.map((c) => (
           <g key={c.number}>
-            <circle cx={c.x} cy={c.y} r={width * 0.011} fill="#05070a" stroke="#4b5563" strokeWidth={width * 0.0015} />
-            <text x={c.x} y={c.y} fontSize={width * 0.013} fill="#c7ccd6" textAnchor="middle" dominantBaseline="central">
+            <circle cx={c.x} cy={c.y} r={width * 0.011} fill="#ffffff" stroke="#94a3b8" strokeWidth={width * 0.0015} />
+            <text x={c.x} y={c.y} fontSize={width * 0.013} fill="#334155" textAnchor="middle" dominantBaseline="central">
               {c.number}
             </text>
           </g>
@@ -253,7 +265,7 @@ useEffect(() => {
             cy={d.y as number}
             r={d.driver_number === selectedDriver ? width * 0.017 : width * 0.01}
             fill={teamColor(d.team)}
-            stroke={d.driver_number === selectedDriver ? "#ffffff" : "#05070a"}
+            stroke={d.driver_number === selectedDriver ? "#111827" : "#ffffff"}
             strokeWidth={width * 0.002}
             style={{ cursor: onSelectDriver ? "pointer" : undefined }}
             onClick={() => onSelectDriver?.(d.driver_number)}
@@ -266,7 +278,7 @@ useEffect(() => {
               y1={selected.y as number}
               x2={(selected.x as number) + width * 0.02}
               y2={(selected.y as number) - width * 0.045}
-              stroke="#e5e7eb"
+              stroke="#111827"
               strokeWidth={width * 0.0015}
             />
             <rect

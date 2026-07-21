@@ -26,18 +26,18 @@ import { TeamRadioPanel } from "./panels/TeamRadioPanel";
 // ponytail: fixed heuristic heights tuned by eye per panel's typical content density,
 // not a true content-driven autosize. Upgrade path: measure content and size dynamically.
 const DASHBOARD_DEFAULT_LAYOUT: WidgetLayoutItem[] = [
-  { i: "overview", x: 0, y: 0, w: 3, h: 4 },
-  { i: "timing-tower", x: 0, y: 4, w: 3, h: 10 },
-  { i: "circuit", x: 3, y: 0, w: 6, h: 10 },
-  { i: "sector-times", x: 3, y: 10, w: 6, h: 8 },
-  { i: "gap-trend", x: 3, y: 18, w: 6, h: 8 },
-  { i: "tire-strategy", x: 3, y: 26, w: 6, h: 8 },
-  { i: "selected-driver", x: 9, y: 0, w: 3, h: 8 },
-  { i: "telemetry", x: 9, y: 8, w: 3, h: 10 },
-  { i: "weather", x: 9, y: 18, w: 3, h: 5 },
-  { i: "team-radio", x: 9, y: 23, w: 3, h: 5 },
-  { i: "race-engineer-notes", x: 9, y: 28, w: 3, h: 6 },
-  { i: "ai-chat", x: 9, y: 34, w: 3, h: 8 },
+  { i: "circuit", x: 0, y: 0, w: 9, h: 16 },
+  { i: "overview", x: 9, y: 0, w: 3, h: 4 },
+  { i: "timing-tower", x: 9, y: 4, w: 3, h: 10 },
+  { i: "sector-times", x: 0, y: 16, w: 9, h: 8 },
+  { i: "gap-trend", x: 0, y: 24, w: 9, h: 8 },
+  { i: "tire-strategy", x: 0, y: 32, w: 9, h: 8 },
+  { i: "selected-driver", x: 9, y: 14, w: 3, h: 8 },
+  { i: "telemetry", x: 9, y: 22, w: 3, h: 10 },
+  { i: "weather", x: 9, y: 32, w: 3, h: 5 },
+  { i: "team-radio", x: 9, y: 37, w: 3, h: 5 },
+  { i: "race-engineer-notes", x: 9, y: 42, w: 3, h: 6 },
+  { i: "ai-chat", x: 9, y: 48, w: 3, h: 8 },
 ];
 
 const LAYOUT_KEY = "pitwall-dashboard-layout";
