@@ -16,7 +16,17 @@ type LayoutPoint = number[];
 type Corner = { number: number; x: number; y: number };
 type DrsZone = { start_x: number; start_y: number; end_x: number; end_y: number };
 
-// Sector colors, matching the red/blue/yellow convention on official circuit posters.
+// Which boundary set colors the outline: no division, the 3 real timing
+// sectors, or FastF1's much finer-grained marshal ("micro") sectors.
+type MapLayer = "blank" | "sectors" | "micro";
+const MAP_LAYERS: { id: MapLayer; label: string }[] = [
+  { id: "blank", label: "Blank" },
+  { id: "sectors", label: "Sectors" },
+  { id: "micro", label: "Micro sectors" },
+];
+
+// Sector colors, matching the red/blue/yellow convention on official circuit
+// posters - cycles for layers with more than 3 boundaries (micro sectors).
 const SECTOR_COLORS = ["#e10600", "#3ecbff", "#ffd400"];
 
 function sectorIndex(distance: number, boundaries: number[]): number {
@@ -24,7 +34,7 @@ function sectorIndex(distance: number, boundaries: number[]): number {
   for (let i = 1; i < boundaries.length; i++) {
     if (distance >= boundaries[i]) index = i;
   }
-  return Math.min(index, SECTOR_COLORS.length - 1);
+  return index % SECTOR_COLORS.length;
 }
 
 // Splits the lap outline into per-sector-colored segments (sharing endpoints so
@@ -103,14 +113,22 @@ export function TrackMap({
   const [fetchedPoints, setFetchedPoints] = useState<LayoutPoint[]>([]);
   const [corners, setCorners] = useState<Corner[]>([]);
   const [sectorBoundaries, setSectorBoundaries] = useState<number[]>([]);
+  const [microSectorBoundaries, setMicroSectorBoundaries] = useState<number[]>([]);
   const [drsZones, setDrsZones] = useState<DrsZone[]>([]);
+  const [layer, setLayer] = useState<MapLayer>("sectors");
   const [view, setView] = useState<View>(DEFAULT_VIEW);
   const [containerSize, setContainerSize] = useState<{ w: number; h: number } | null>(null);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
 
-  type TrackLayoutResponse = { points: LayoutPoint[]; corners?: Corner[]; sector_boundaries?: number[]; drs_zones?: DrsZone[] };
+  type TrackLayoutResponse = {
+    points: LayoutPoint[];
+    corners?: Corner[];
+    sector_boundaries?: number[];
+    micro_sector_boundaries?: number[];
+    drs_zones?: DrsZone[];
+  };
 
   useEffect(() => {
     if (!sessionParams) return;
@@ -121,6 +139,7 @@ export function TrackMap({
         setFetchedPoints(data.points);
         setCorners(data.corners ?? []);
         setSectorBoundaries(data.sector_boundaries ?? []);
+        setMicroSectorBoundaries(data.micro_sector_boundaries ?? []);
         setDrsZones(data.drs_zones ?? []);
       });
   }, [sessionParams]);
@@ -143,6 +162,7 @@ export function TrackMap({
             if (!cancelled) {
               setCorners(data.corners ?? []);
               setSectorBoundaries(data.sector_boundaries ?? []);
+              setMicroSectorBoundaries(data.micro_sector_boundaries ?? []);
               setDrsZones(data.drs_zones ?? []);
             }
           }
@@ -268,8 +288,10 @@ export function TrackMap({
   const viewH = contentAspect > containerAspect ? contentH : contentW / containerAspect;
 
   // buildSectorSegments itself falls back to a single plain-colored line when
-  // points carry no per-point distance (traced live points never do).
-  const segments = buildSectorSegments(points, sectorBoundaries);
+  // points carry no per-point distance (traced live points never do), or when
+  // the "blank" layer is picked (an empty boundary list forces that fallback).
+  const activeBoundaries = layer === "blank" ? [] : layer === "micro" ? microSectorBoundaries : sectorBoundaries;
+  const segments = buildSectorSegments(points, activeBoundaries);
   const roadPoints = [...points, points[0]];
 
   const drsOverlays = rotatedDrsZones.map((z) => {
@@ -313,6 +335,20 @@ export function TrackMap({
   return (
     <>
       <div ref={canvasRef} className="pitwall-circuit-canvas" style={{ position: "relative", width: "100%", height: "100%" }}>
+        <div className="pitwall-map-layers" role="radiogroup" aria-label="Map layer">
+          {MAP_LAYERS.map((l) => (
+            <button
+              key={l.id}
+              type="button"
+              role="radio"
+              aria-checked={layer === l.id}
+              className={layer === l.id ? "pitwall-map-layer-active" : ""}
+              onClick={() => setLayer(l.id)}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           className="pitwall-reset-view-button"

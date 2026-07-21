@@ -245,6 +245,7 @@ def test_load_track_layout_includes_corners_and_sector_boundaries(monkeypatch):
 
     class FakeCircuitInfo:
         corners = pd.DataFrame([{"Number": 1, "X": 5.0, "Y": 5.0}, {"Number": 2, "X": 15.0, "Y": 15.0}])
+        marshal_sectors = pd.DataFrame([{"Number": 1, "Distance": 0.0}, {"Number": 2, "Distance": 90.0}, {"Number": 3, "Distance": 150.0}])
 
     class FakeSession:
         laps = FakeLaps()
@@ -261,6 +262,8 @@ def test_load_track_layout_includes_corners_and_sector_boundaries(monkeypatch):
     # 30% and 70% of the fastest lap's total distance (200) - splits it into
     # exactly 3 real timing sectors, not FastF1's much finer marshal sectors.
     assert layout["sector_boundaries"] == [60.0, 140.0]
+    # marshal sectors are kept separately as the finer-grained "micro sectors" layer.
+    assert layout["micro_sector_boundaries"] == [0.0, 90.0, 150.0]
     assert layout["drs_zones"] == []  # fixture telemetry has no DRS column
 
 

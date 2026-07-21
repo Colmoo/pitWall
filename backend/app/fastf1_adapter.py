@@ -270,19 +270,25 @@ def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) 
     except KeyError:
         # Some older/incomplete sessions (e.g. 2018 Australian GP) have no car
         # position telemetry at all - degrade to an empty layout rather than 500.
-        return {"points": [], "corners": [], "sector_boundaries": [], "drs_zones": []}
+        return {"points": [], "corners": [], "sector_boundaries": [], "micro_sector_boundaries": [], "drs_zones": []}
 
     # points carry Distance-along-lap as a 3rd value so the frontend can color
     # each segment by timing sector, like an official circuit poster.
     points = track_layout_from_telemetry(telemetry, extra_columns=["Distance"])
 
     corners: list[dict] = []
+    # FastF1's marshal_sectors are a much finer-grained division than the 3
+    # timing sectors (flag/marshalling posts, often 15-20 per circuit) - kept
+    # as their own "micro sectors" map layer rather than folded into the real
+    # sector split below.
+    micro_sector_boundaries: list[float] = []
     circuit_info = session.get_circuit_info()
     if circuit_info is not None:
         corners = [
             {"number": int(row["Number"]), "x": float(row["X"]), "y": float(row["Y"])}
             for _, row in circuit_info.corners.iterrows()
         ]
+        micro_sector_boundaries = sorted(float(d) for d in circuit_info.marshal_sectors["Distance"].tolist())
 
     # The real S1/S2/S3 timing-sector boundaries aren't published as geometry -
     # FastF1's marshal_sectors are a different, much finer-grained thing (used
@@ -309,7 +315,13 @@ def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) 
     # fastest lap's DRS channel was actually open, rather than fabricating zones.
     drs_zones = _drs_zones_from_telemetry(telemetry)
 
-    return {"points": points, "corners": corners, "sector_boundaries": sector_boundaries, "drs_zones": drs_zones}
+    return {
+        "points": points,
+        "corners": corners,
+        "sector_boundaries": sector_boundaries,
+        "micro_sector_boundaries": micro_sector_boundaries,
+        "drs_zones": drs_zones,
+    }
 
 
 # ponytail: 2018 is the earliest season FastF1's lap-by-lap timing data is

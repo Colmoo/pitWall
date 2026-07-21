@@ -314,6 +314,36 @@ body {
   border-color: var(--cyan);
 }
 
+.pitwall-map-layers {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 1;
+  display: flex;
+  gap: 4px;
+}
+
+.pitwall-map-layers button {
+  background: var(--panel);
+  color: var(--label);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 3px 8px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.pitwall-map-layers button:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.pitwall-map-layers .pitwall-map-layer-active {
+  color: var(--panel);
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+
 .pitwall-circuit-name {
   margin-top: 8px;
   color: var(--label);

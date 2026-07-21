@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { TrackMap } from "./TrackMap";
 import type { SessionState } from "../types";
@@ -105,6 +105,31 @@ test("colors the outline by marshal sector when the layout includes distance and
   expect(paths.length).toBe(4);
   expect(new Set(Array.from(paths).map((p) => p.getAttribute("stroke"))).size).toBe(4);
   expect(screen.getByText("1")).toBeInTheDocument();
+});
+
+test("map layer picker switches between blank, sectors, and micro sectors", async () => {
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      points: [[0, 0, 0], [10, 0, 10], [10, 10, 20], [0, 10, 30]],
+      sector_boundaries: [0, 15, 25],
+      micro_sector_boundaries: [0, 5, 15, 22, 28],
+    }),
+  });
+
+  render(<TrackMap state={null} sessionParams={{ year: 2023, event: "Suzuka", sessionType: "R" }} />);
+
+  const outline = await waitFor(() => screen.getByTestId("track-outline"));
+  // defaults to the "Sectors" layer: 1 road path + 3 sector segments.
+  expect(outline.querySelectorAll("path").length).toBe(4);
+
+  fireEvent.click(screen.getByRole("radio", { name: "Micro sectors" }));
+  // more boundaries -> more segments than the 3-way sector split.
+  expect(outline.querySelectorAll("path").length).toBeGreaterThan(4);
+
+  fireEvent.click(screen.getByRole("radio", { name: "Blank" }));
+  // no division -> 1 road path + 1 plain-colored segment.
+  expect(outline.querySelectorAll("path").length).toBe(2);
 });
 
 test("shows a name flag above the selected driver's dot", async () => {
