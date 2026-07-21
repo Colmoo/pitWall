@@ -282,9 +282,17 @@ body {
   text-align: center;
 }
 
-.pitwall-circuit-bezel svg {
+.pitwall-circuit-bezel .pitwall-panel-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+}
+
+.pitwall-circuit-canvas {
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  height: auto;
 }
 
 .pitwall-reset-view-button {

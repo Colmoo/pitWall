@@ -100,9 +100,10 @@ test("colors the outline by marshal sector when the layout includes distance and
 
   const outline = await waitFor(() => screen.getByTestId("track-outline"));
   const paths = outline.querySelectorAll("path");
-  // 3 sectors present across the sampled points -> 3 distinctly-colored segments.
-  expect(paths.length).toBe(3);
-  expect(new Set(Array.from(paths).map((p) => p.getAttribute("stroke"))).size).toBe(3);
+  // 1 dark road-bed path, plus 3 sectors present across the sampled points -> 3
+  // distinctly-colored centerline segments on top of it.
+  expect(paths.length).toBe(4);
+  expect(new Set(Array.from(paths).map((p) => p.getAttribute("stroke"))).size).toBe(4);
   expect(screen.getByText("1")).toBeInTheDocument();
 });
 
@@ -146,10 +147,31 @@ test("renders a DRS zone overlay when the layout includes drs_zones", async () =
 
   render(<TrackMap state={null} sessionParams={{ year: 2023, event: "Baku", sessionType: "R" }} />);
 
-  await waitFor(() => expect(screen.getByTestId("drs-zone")).toBeInTheDocument());
+  const zone = await waitFor(() => screen.getByTestId("drs-zone"));
+  // drawn as its own dashed line offset alongside the track, not on top of it.
+  expect(zone.getAttribute("stroke-dasharray")).not.toBeNull();
+  const [, y] = zone.getAttribute("d")!.replace("M", "").split(" ")[0].split(",").map(Number);
+  expect(y).not.toBe(0); // the track's own points sit at y=0; the offset line does not
 });
 
-test("keeps the viewBox square for a non-square (wide) track so the bezel ring never clips", async () => {
+test("rotates a wide track 90deg to fill a portrait-shaped panel instead of leaving it sideways-cramped", async () => {
+  // jsdom has no layout engine, so ResizeObserver is mocked to report a tall,
+  // narrow panel (portrait) - the opposite orientation of the wide track below.
+  const observe = vi.fn();
+  class FakeResizeObserver {
+    constructor(private callback: ResizeObserverCallback) {}
+    observe(target: Element) {
+      observe(target);
+      this.callback(
+        [{ contentRect: { width: 200, height: 800 } } as ResizeObserverEntry],
+        this as unknown as ResizeObserver,
+      );
+    }
+    unobserve() {}
+    disconnect() {}
+  }
+  vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
     json: async () => ({ points: [[0, 0], [100, 0], [100, 10], [0, 10]] }),
@@ -160,5 +182,23 @@ test("keeps the viewBox square for a non-square (wide) track so the bezel ring n
   const outline = await waitFor(() => screen.getByTestId("track-outline"));
   const svg = outline.closest("svg");
   const [, , vbWidth, vbHeight] = svg!.getAttribute("viewBox")!.split(" ").map(Number);
-  expect(vbWidth).toBeCloseTo(vbHeight);
+  // rotated to match the portrait panel: viewBox is now taller than it is wide.
+  expect(vbHeight).toBeGreaterThan(vbWidth);
+
+  vi.unstubAllGlobals();
+});
+
+test("fits the viewBox to the track's own aspect ratio instead of padding it to a blank square", async () => {
+  global.fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ points: [[0, 0], [100, 0], [100, 10], [0, 10]] }),
+  });
+
+  render(<TrackMap state={null} sessionParams={{ year: 2023, event: "Silverstone", sessionType: "R" }} />);
+
+  const outline = await waitFor(() => screen.getByTestId("track-outline"));
+  const svg = outline.closest("svg");
+  const [, , vbWidth, vbHeight] = svg!.getAttribute("viewBox")!.split(" ").map(Number);
+  // a 100x10 track stays wide (not padded out to a square), so no blank bars.
+  expect(vbWidth / vbHeight).toBeGreaterThan(5);
 });
