@@ -230,8 +230,14 @@ def test_load_track_layout_includes_corners_and_sector_boundaries(monkeypatch):
     telemetry = pd.DataFrame({"X": [0.0, 1.0, 2.0], "Y": [0.0, 1.0, 2.0], "Distance": [0.0, 100.0, 200.0]})
 
     class FakeLap:
+        # LapTime=100s, split 30/40/30 across the 3 timing sectors.
+        _data = {"LapTime": timedelta(seconds=100), "Sector1Time": timedelta(seconds=30), "Sector2Time": timedelta(seconds=40)}
+
         def get_telemetry(self):
             return telemetry
+
+        def __getitem__(self, key):
+            return self._data[key]
 
     class FakeLaps:
         def pick_fastest(self):
@@ -239,7 +245,6 @@ def test_load_track_layout_includes_corners_and_sector_boundaries(monkeypatch):
 
     class FakeCircuitInfo:
         corners = pd.DataFrame([{"Number": 1, "X": 5.0, "Y": 5.0}, {"Number": 2, "X": 15.0, "Y": 15.0}])
-        marshal_sectors = pd.DataFrame([{"Number": 1, "Distance": 0.0}, {"Number": 2, "Distance": 150.0}, {"Number": 3, "Distance": 400.0}])
 
     class FakeSession:
         laps = FakeLaps()
@@ -253,7 +258,9 @@ def test_load_track_layout_includes_corners_and_sector_boundaries(monkeypatch):
 
     assert layout["points"] == [[0.0, 0.0, 0.0], [1.0, 1.0, 100.0], [2.0, 2.0, 200.0]]
     assert layout["corners"] == [{"number": 1, "x": 5.0, "y": 5.0}, {"number": 2, "x": 15.0, "y": 15.0}]
-    assert layout["sector_boundaries"] == [0.0, 150.0, 400.0]
+    # 30% and 70% of the fastest lap's total distance (200) - splits it into
+    # exactly 3 real timing sectors, not FastF1's much finer marshal sectors.
+    assert layout["sector_boundaries"] == [60.0, 140.0]
     assert layout["drs_zones"] == []  # fixture telemetry has no DRS column
 
 
@@ -286,6 +293,41 @@ def test_load_track_layout_approximates_drs_zones_from_open_drs_spans(monkeypatc
     layout = load_track_layout(year=2026, event="Suzuka", session_type="R", cache_dir="/tmp/x")
 
     assert layout["drs_zones"] == [{"start_x": 1.0, "start_y": 0.0, "end_x": 3.0, "end_y": 0.0}]
+    # fastest lap here has no sector-time data at all (FakeLap isn't subscriptable) -
+    # degrades to an undivided outline instead of crashing.
+    assert layout["sector_boundaries"] == []
+
+
+def test_load_track_layout_degrades_sector_boundaries_when_fastest_lap_has_no_sector_times(monkeypatch):
+    # A red-flagged or otherwise incomplete "fastest" lap can have NaT sector
+    # times - total_seconds() on NaT is NaN, not an exception, so this must be
+    # guarded explicitly rather than relying on a try/except to catch it.
+    telemetry = pd.DataFrame({"X": [0.0, 1.0], "Y": [0.0, 1.0], "Distance": [0.0, 100.0]})
+
+    class FakeLap:
+        _data = {"LapTime": pd.NaT, "Sector1Time": pd.NaT, "Sector2Time": pd.NaT}
+
+        def get_telemetry(self):
+            return telemetry
+
+        def __getitem__(self, key):
+            return self._data[key]
+
+    class FakeLaps:
+        def pick_fastest(self):
+            return FakeLap()
+
+    class FakeSession:
+        laps = FakeLaps()
+
+        def get_circuit_info(self):
+            return None
+
+    monkeypatch.setattr("app.fastf1_adapter.get_or_load_session", lambda *args, **kwargs: FakeSession())
+
+    layout = load_track_layout(year=2026, event="Suzuka", session_type="R", cache_dir="/tmp/x")
+
+    assert layout["sector_boundaries"] == []
 
 
 def test_session_states_from_laps_computes_gap_to_leader_and_ahead():

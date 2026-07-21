@@ -324,15 +324,15 @@ export function TrackMap({
           ref={svgRef}
           viewBox={`${vbX} ${vbY} ${scaledW} ${scaledH}`}
           preserveAspectRatio="xMidYMid meet"
-          style={{ width: "100%", height: "100%", display: "block", background: "#ffffff", cursor: dragRef.current ? "grabbing" : "grab", touchAction: "none" }}
+          style={{ width: "100%", height: "100%", display: "block", background: "var(--panel)", cursor: dragRef.current ? "grabbing" : "grab", touchAction: "none" }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerUp}
         >
         <g data-testid="track-outline">
-          {/* dark asphalt road bed */}
-          <path d={pathD(roadPoints)} fill="none" stroke="#15181d" strokeWidth={width * 0.022} strokeLinejoin="round" strokeLinecap="round" />
+          {/* grey tarmac road bed, readable against the dark panel background */}
+          <path d={pathD(roadPoints)} fill="none" stroke="#3a4048" strokeWidth={width * 0.022} strokeLinejoin="round" strokeLinecap="round" />
           {/* thin sector-colored centerline on top */}
           {segments.map((seg, i) => (
             <path key={i} d={pathD(seg.points)} fill="none" stroke={seg.color} strokeWidth={width * 0.006} strokeLinecap="round" />
@@ -354,8 +354,8 @@ export function TrackMap({
         ))}
         {rotatedCorners.map((c) => (
           <g key={c.number}>
-            <circle cx={c.x} cy={c.y} r={width * 0.012} fill="#15181d" stroke="#ffffff" strokeWidth={width * 0.0018} />
-            <text x={c.x} y={c.y} fontSize={width * 0.013} fontWeight="bold" fill="#ffffff" textAnchor="middle" dominantBaseline="central">
+            <circle cx={c.x} cy={c.y} r={width * 0.012} fill="#e5e7eb" stroke="#0a0c10" strokeWidth={width * 0.0018} />
+            <text x={c.x} y={c.y} fontSize={width * 0.013} fontWeight="bold" fill="#0a0c10" textAnchor="middle" dominantBaseline="central">
               {c.number}
             </text>
           </g>
@@ -368,7 +368,7 @@ export function TrackMap({
             cy={d.plotY}
             r={d.driver_number === selectedDriver ? width * 0.017 : width * 0.01}
             fill={teamColor(d.team)}
-            stroke={d.driver_number === selectedDriver ? "#111827" : "#ffffff"}
+            stroke={d.driver_number === selectedDriver ? "#3ecbff" : "#0a0c10"}
             strokeWidth={width * 0.002}
             style={{ cursor: onSelectDriver ? "pointer" : undefined }}
             onClick={() => onSelectDriver?.(d.driver_number)}
@@ -381,7 +381,7 @@ export function TrackMap({
               y1={selected.plotY}
               x2={selected.plotX + width * 0.02}
               y2={selected.plotY - width * 0.045}
-              stroke="#111827"
+              stroke="#e5e7eb"
               strokeWidth={width * 0.0015}
             />
             <rect

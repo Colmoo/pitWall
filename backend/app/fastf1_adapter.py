@@ -273,18 +273,37 @@ def load_track_layout(year: int, event: str, session_type: str, cache_dir: str) 
         return {"points": [], "corners": [], "sector_boundaries": [], "drs_zones": []}
 
     # points carry Distance-along-lap as a 3rd value so the frontend can color
-    # each segment by marshal sector, like an official circuit poster.
+    # each segment by timing sector, like an official circuit poster.
     points = track_layout_from_telemetry(telemetry, extra_columns=["Distance"])
 
     corners: list[dict] = []
-    sector_boundaries: list[float] = []
     circuit_info = session.get_circuit_info()
     if circuit_info is not None:
         corners = [
             {"number": int(row["Number"]), "x": float(row["X"]), "y": float(row["Y"])}
             for _, row in circuit_info.corners.iterrows()
         ]
-        sector_boundaries = sorted(float(d) for d in circuit_info.marshal_sectors["Distance"].tolist())
+
+    # The real S1/S2/S3 timing-sector boundaries aren't published as geometry -
+    # FastF1's marshal_sectors are a different, much finer-grained thing (used
+    # for flags/marshalling posts, not the 3 timing sectors on a poster). Split
+    # the lap into exactly 3 timing sectors instead, using each sector's share
+    # of the fastest lap's total time as a stand-in for its share of distance.
+    sector_boundaries: list[float] = []
+    try:
+        lap_seconds = fastest_lap["LapTime"].total_seconds()
+        sector_1_seconds = fastest_lap["Sector1Time"].total_seconds()
+        sector_2_seconds = fastest_lap["Sector2Time"].total_seconds()
+        total_distance = float(telemetry["Distance"].max())
+        if lap_seconds > 0 and total_distance > 0:
+            sector_boundaries = [
+                (sector_1_seconds / lap_seconds) * total_distance,
+                ((sector_1_seconds + sector_2_seconds) / lap_seconds) * total_distance,
+            ]
+    except (KeyError, AttributeError, TypeError):
+        # Sector times can be NaT for an incomplete/red-flagged fastest lap -
+        # fall back to an undivided (single-color) outline rather than 500.
+        sector_boundaries = []
 
     # DRS zone geometry isn't published by FastF1 - approximate it from where the
     # fastest lap's DRS channel was actually open, rather than fabricating zones.
