@@ -299,6 +299,8 @@ export default function App() {
           <AnalysisTab
             sessionParams={sessionParams}
             analysis={analysis}
+            state={latest}
+            history={history}
             selectedDriver={selectedDriver}
             onSelectDriver={setSelectedDriver}
           />

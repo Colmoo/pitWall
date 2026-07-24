@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ComponentType } from "react";
-import type { LapAnalysis } from "../types";
+import type { LapAnalysis, SessionState } from "../types";
+import { TelemetryTab } from "./TelemetryTab";
 import {
   GapVsFieldAverageChart,
   GapToLeaderChart,
@@ -38,11 +39,15 @@ const VIEWS: { name: string; chart?: ComponentType<ChartProps> }[] = [
 export function AnalysisTab({
   sessionParams,
   analysis,
+  state,
+  history,
   selectedDriver,
   onSelectDriver,
 }: {
   sessionParams: SessionParams;
   analysis: LapAnalysis | null;
+  state: SessionState | null;
+  history: SessionState[];
   selectedDriver: string | null;
   onSelectDriver: (driverNumber: string) => void;
 }) {
@@ -67,6 +72,9 @@ export function AnalysisTab({
       <section className="pitwall-analysis-main">
         {!sessionParams ? (
           <p>Race analysis is available in replay mode. Start a replay from the landing page.</p>
+        ) : viewName === "Lap Comparison" ? (
+          // Reuse the full multi-driver, distance-aligned telemetry overlay.
+          <TelemetryTab sessionParams={sessionParams} state={state} history={history} />
         ) : Chart ? (
           <Chart analysis={analysis} selectedDriver={selectedDriver} onSelectDriver={onSelectDriver} />
         ) : (
