@@ -157,17 +157,22 @@ _live_circuit_info_task: asyncio.Task | None = None
 
 async def _load_live_circuit_info(identity: tuple[int, str, str]) -> None:
     global _live_circuit_info
-    year, event, session_type = identity
-    try:
-        _live_circuit_info = await asyncio.to_thread(
-            load_track_layout, year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
-        )
-    except Exception:
-        # Best-effort parity for live mode - the live feed's session path format
-        # isn't verified against a real stream yet, and the resolved event name
-        # may not match FastF1's schedule. Keep the plain traced map instead of
-        # failing the live session over decorative circuit info.
-        logger.exception("Failed to load matching FastF1 circuit info for live session %s", identity)
+    year, event, _ = identity
+    # A live/in-progress session has no FastF1 telemetry yet (DataNotLoadedError),
+    # but the circuit geometry is stable year to year - so fall back to recent
+    # past races of the same event, which are fully loaded, to draw the outline.
+    for y, st in [(year - 1, "R"), (year - 2, "R"), (year - 3, "R")]:
+        try:
+            layout = await asyncio.to_thread(
+                load_track_layout, year=y, event=event, session_type=st, cache_dir=CACHE_DIR,
+            )
+        except Exception:
+            logger.info("Live circuit info: %s %s %s not available, trying older", y, event, st)
+            continue
+        if layout.get("points"):
+            _live_circuit_info = layout
+            return
+    logger.warning("No FastF1 circuit outline available for live session %s", identity)
 
 
 def _maybe_start_live_circuit_info_lookup(tree: dict) -> None:

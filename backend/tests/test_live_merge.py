@@ -29,6 +29,36 @@ def test_merge_patch_merges_lists_by_index_and_extends():
     }
 
 
+def test_merge_patch_applies_index_keyed_dict_onto_list():
+    # F1's live feed patches arrays as numeric-string-keyed objects; this must
+    # update the list in place (by index) instead of replacing it with a dict,
+    # otherwise downstream sectors[0] indexing raises KeyError.
+    base = {"Sectors": [{"Value": "28.1"}, {"Value": "31.0"}, {"Value": "22.5"}]}
+    patch = {"Sectors": {"1": {"Value": "30.4", "Segments": {"2": {"Status": 2051}}}}}
+    result = merge_patch(base, patch)
+    assert isinstance(result["Sectors"], list)
+    assert result["Sectors"][0] == {"Value": "28.1"}
+    assert result["Sectors"][1]["Value"] == "30.4"
+    assert result["Sectors"][1]["Segments"] == {"2": {"Status": 2051}} or isinstance(
+        result["Sectors"][1]["Segments"], list
+    )
+    assert result["Sectors"][2] == {"Value": "22.5"}
+
+
+def test_merge_patch_index_keyed_dict_onto_nested_list_segments():
+    base = {"Sectors": [{"Segments": [{"Status": 0}, {"Status": 0}]}]}
+    patch = {"Sectors": {"0": {"Segments": {"1": {"Status": 2049}}}}}
+    result = merge_patch(base, patch)
+    assert result["Sectors"][0]["Segments"] == [{"Status": 0}, {"Status": 2049}]
+
+
+def test_merge_patch_index_keyed_dict_extends_list_with_padding():
+    base = {"s": [{"v": 1}]}
+    patch = {"s": {"2": {"v": 3}}}
+    result = merge_patch(base, patch)
+    assert result["s"] == [{"v": 1}, None, {"v": 3}]
+
+
 def test_merge_patch_does_not_mutate_inputs():
     base = {"a": {"b": 1}}
     patch = {"a": {"c": 2}}

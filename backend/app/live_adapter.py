@@ -70,13 +70,47 @@ def _parse_gap(value) -> float | None:
 
 
 def _parse_sector(sectors: list, index: int) -> float | None:
-    if index >= len(sectors):
+    # merge_patch keeps arrays as lists, but guard against a stray index-keyed
+    # dict slipping through (the original live crash was sectors[0] on a dict).
+    if not isinstance(sectors, list) or index >= len(sectors):
         return None
-    value = sectors[index].get("Value")
+    entry = sectors[index]
+    if not isinstance(entry, dict):
+        return None
+    value = entry.get("Value")
     if not value:
         return None
     try:
         return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_speed_trap(speeds: dict, key: str) -> float | None:
+    # TimingData.Lines[n].Speeds: {"I1": {"Value": "209"}, "I2", "FL", "ST"}
+    # - km/h recorded at fixed track points (intermediates, finish line, speed
+    # trap), updated each time the car passes that point. "" until first set.
+    if not isinstance(speeds, dict):
+        return None
+    entry = speeds.get(key)
+    if not isinstance(entry, dict):
+        return None
+    try:
+        return float(entry.get("Value"))
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_best_sector(best_sectors: list, index: int) -> float | None:
+    # TimingStats.Lines[n].BestSectors: [{"Position": rank, "Value": "27.782"}, ...]
+    # - each driver's best time in that sector across the session (quali/practice).
+    if not isinstance(best_sectors, list) or index >= len(best_sectors):
+        return None
+    entry = best_sectors[index]
+    if not isinstance(entry, dict):
+        return None
+    try:
+        return float(entry.get("Value"))
     except (ValueError, TypeError):
         return None
 
@@ -219,6 +253,7 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
     drivers: list[DriverState] = []
     if driver_list and timing_lines:
         app_data_lines = tree.get("TimingAppData", {}).get("Lines", {})
+        stats_lines = tree.get("TimingStats", {}).get("Lines", {})
         position_entries = _latest_position_entries(tree)
         car_data_entries = _latest_car_data_entries(tree)
 
@@ -231,6 +266,8 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
                 continue
 
             sectors = timing.get("Sectors", [])
+            speeds = timing.get("Speeds", {})
+            best_sectors = stats_lines.get(number, {}).get("BestSectors", [])
             stints = app_data_lines.get(number, {}).get("Stints", [])
             latest_stint = stints[-1] if stints else {}
 
@@ -248,8 +285,16 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
                     # publicly-documented live-timing schema assumed elsewhere in
                     # this file - not yet verified against a real live stream.
                     status="out" if (timing.get("Retired") or timing.get("Stopped")) else "running",
-                    gap_to_leader=_parse_gap(timing.get("GapToLeader")),
-                    gap_to_ahead=_parse_gap(timing.get("IntervalToPositionAhead", {}).get("Value")),
+                    # Race uses Gap/IntervalToPositionAhead; practice/quali omit
+                    # those and expose lap-based deltas instead (gap to the
+                    # session's fastest lap, and interval to the car ahead on the
+                    # timesheet) - fall back to those so quali/practice show intervals.
+                    gap_to_leader=_parse_gap(timing.get("GapToLeader")) if timing.get("GapToLeader") else _parse_gap(timing.get("TimeDiffToFastest")),
+                    gap_to_ahead=(
+                        _parse_gap(timing.get("IntervalToPositionAhead", {}).get("Value"))
+                        if timing.get("IntervalToPositionAhead")
+                        else _parse_gap(timing.get("TimeDiffToPositionAhead"))
+                    ),
                     last_lap_time=_parse_lap_time(timing.get("LastLapTime", {}).get("Value")),
                     best_lap_time=_parse_lap_time(timing.get("BestLapTime", {}).get("Value")),
                     tire=Tire(
@@ -260,6 +305,13 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
                     sector_1_time=_parse_sector(sectors, 0),
                     sector_2_time=_parse_sector(sectors, 1),
                     sector_3_time=_parse_sector(sectors, 2),
+                    best_sector_1_time=_parse_best_sector(best_sectors, 0),
+                    best_sector_2_time=_parse_best_sector(best_sectors, 1),
+                    best_sector_3_time=_parse_best_sector(best_sectors, 2),
+                    speed_i1=_parse_speed_trap(speeds, "I1"),
+                    speed_i2=_parse_speed_trap(speeds, "I2"),
+                    speed_fl=_parse_speed_trap(speeds, "FL"),
+                    speed_st=_parse_speed_trap(speeds, "ST"),
                     micro_sectors=_parse_micro_sectors(sectors),
                     flying_lap=_parse_flying_lap(timing),
                     x=pos_entry.get("X"),

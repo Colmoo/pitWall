@@ -165,9 +165,10 @@ export function TrackMap({
         try {
           const res = await fetch(`${API_URL}/session/live/track-layout`);
           const data: TrackLayoutResponse = await res.json();
-          if (data.corners?.length || data.sector_boundaries?.length) {
+          if (data.points?.length) {
             found = true;
             if (!cancelled) {
+              setFetchedPoints(data.points);
               setCorners(data.corners ?? []);
               setSectorBoundaries(data.sector_boundaries ?? []);
               setMicroSectorBoundaries(data.micro_sector_boundaries ?? []);
@@ -207,7 +208,9 @@ export function TrackMap({
     return acc.points;
   }, [history, sessionParams]);
 
-  const rawPoints = sessionParams ? fetchedPoints : tracedPoints;
+  // Prefer a real fetched outline (replay, or the live past-year fallback);
+  // fall back to points traced from live car positions if that's all we have.
+  const rawPoints = fetchedPoints.length >= 2 ? fetchedPoints : tracedPoints;
 
   // Tracks the canvas box's real pixel size so the viewBox can be shaped to
   // exactly match it (see "cover fit" below) instead of leaving blank bars.
@@ -244,7 +247,7 @@ export function TrackMap({
   }, [rawPoints.length >= 2]);
 
   if (rawPoints.length < 2) {
-    return <p>{sessionParams ? "Loading track layout..." : "Tracing track from live car positions..."}</p>;
+    return <p>Loading track layout...</p>;
   }
 
   const rawXs = rawPoints.map((p) => p[0]);

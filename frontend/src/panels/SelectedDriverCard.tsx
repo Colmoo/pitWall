@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from "react";
 import type { SessionState } from "../types";
 import { formatGap, tireColor } from "../constants";
 
@@ -10,27 +9,19 @@ export function SelectedDriverCard({
   selectedDriver: string | null;
 }) {
   const driver = state?.drivers.find((d) => d.driver_number === selectedDriver) ?? null;
-  const lapNumber = driver?.lap_number ?? null;
-
-  // Running current-lap clock: reset when the driver or their lap changes, then
-  // tick every 100ms so the card shows the lap time as it's happening.
-  // ponytail: wall-clock since lap start assumes ~1x playback; drifts at other
-  // replay speeds. Upgrade path: base it on state.timestamp deltas if that matters.
-  const lapStartRef = useRef<number>(Date.now());
-  const [nowTick, setNowTick] = useState<number>(Date.now());
-  useEffect(() => {
-    lapStartRef.current = Date.now();
-    setNowTick(Date.now());
-  }, [selectedDriver, lapNumber]);
-  useEffect(() => {
-    const id = setInterval(() => setNowTick(Date.now()), 100);
-    return () => clearInterval(id);
-  }, []);
-  const runningLap = driver && driver.status !== "out" ? (nowTick - lapStartRef.current) / 1000 : null;
 
   if (!driver) {
     return <p>Select a driver to see details.</p>;
   }
+
+  // Current lap progress straight from the timing feed: sum of this lap's posted
+  // sector times (it fills in S1 -> S1+S2 -> full lap as each sector completes).
+  // No wall-clock stopwatch - the feed carries no live lap timer, so we only
+  // show real, API-sourced sector splits rather than a clock that starts on click.
+  const posted = [driver.sector_1_time, driver.sector_2_time, driver.sector_3_time].filter(
+    (t): t is number => t !== null,
+  );
+  const runningLap = driver.status !== "out" && posted.length > 0 ? posted.reduce((a, b) => a + b, 0) : null;
 
   const radioClips = (state?.team_radio ?? [])
     .filter((clip) => clip.driver_number === selectedDriver)
@@ -76,6 +67,22 @@ export function SelectedDriverCard({
           {formatGap(driver.gap_to_ahead)}
         </div>
       </div>
+      {[driver.speed_i1, driver.speed_i2, driver.speed_fl, driver.speed_st].some((s) => s !== null) && (
+        <div className="pitwall-speed-traps" data-testid="speed-traps">
+          <div className="pitwall-stat">
+            <div className="pitwall-stat-label">Speed I1 / I2</div>
+            <div className="pitwall-stat-value cyan">
+              {driver.speed_i1?.toFixed(0) ?? "-"} / {driver.speed_i2?.toFixed(0) ?? "-"} km/h
+            </div>
+          </div>
+          <div className="pitwall-stat">
+            <div className="pitwall-stat-label">Finish Line / Speed Trap</div>
+            <div className="pitwall-stat-value cyan">
+              {driver.speed_fl?.toFixed(0) ?? "-"} / {driver.speed_st?.toFixed(0) ?? "-"} km/h
+            </div>
+          </div>
+        </div>
+      )}
       {driver.speed !== null && (
         <div className="pitwall-live-telemetry" data-testid="live-telemetry">
           <div className="pitwall-stat">

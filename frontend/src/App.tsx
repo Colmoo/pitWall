@@ -181,7 +181,7 @@ export default function App() {
         />
       ),
     },
-    { id: "sector-times", title: "Sector Times", node: <SectorTimes state={latest} /> },
+    { id: "sector-times", title: "Sector Times", node: <SectorTimes state={latest} qualifyingMode={qualifyingView} /> },
     { id: "gap-trend", title: "Gap Trend (to Leader)", node: <GapTrendChart history={history} selectedDriver={selectedDriver} /> },
     { id: "tire-strategy", title: "Tire Strategy", node: <TireStrategy history={history} /> },
     { id: "selected-driver", title: "Selected Driver", node: <SelectedDriverCard state={latest} selectedDriver={selectedDriver} /> },

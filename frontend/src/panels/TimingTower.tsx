@@ -65,7 +65,7 @@ export function TimingTower({
         <thead>
           <tr>
             <th>Pos</th><th>Driver</th><th>Tire</th><th>Last Lap</th><th>Best Lap</th>
-            {!qualifyingMode && <th>Gap</th>}<th>Int</th><th>S1</th><th>S2</th><th>S3</th>
+            <th>{qualifyingMode ? "To Fastest" : "Gap"}</th><th>Int</th><th>S1</th><th>S2</th><th>S3</th>
           </tr>
         </thead>
         <tbody>
@@ -102,7 +102,7 @@ export function TimingTower({
               >
                 {d.best_lap_time?.toFixed(3) ?? "-"}
               </td>
-              {!qualifyingMode && <td>{formatGap(d.gap_to_leader)}</td>}
+              <td>{formatGap(d.gap_to_leader)}</td>
               <td>{formatGap(d.gap_to_ahead)}</td>
               <td style={d.driver_number === bestS1 ? { color: "var(--purple)" } : undefined}>
                 {d.sector_1_time?.toFixed(3) ?? "-"}

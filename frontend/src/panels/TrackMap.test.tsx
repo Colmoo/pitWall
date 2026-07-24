@@ -15,9 +15,10 @@ test("fetches and renders the track outline for the given session params", async
   expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining("/session/track-layout"));
 });
 
-test("shows a tracing placeholder in live mode until enough position samples arrive", () => {
+test("shows a loading placeholder in live mode until an outline is available", () => {
+  global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ points: [] }) });
   render(<TrackMap state={null} sessionParams={null} history={[]} />);
-  expect(screen.getByText(/tracing track/i)).toBeInTheDocument();
+  expect(screen.getByText(/loading track layout/i)).toBeInTheDocument();
 });
 
 test("traces the track outline from leader positions in live mode without waiting on a fetch", async () => {

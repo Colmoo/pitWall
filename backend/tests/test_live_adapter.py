@@ -84,6 +84,63 @@ def test_session_state_from_live_tree_parses_sectors_and_lap_number():
     assert ver.lap_number == 12
 
 
+def test_session_state_from_live_tree_parses_best_sectors_from_timing_stats():
+    tree = _tree(TimingStats={"Lines": {"1": {"BestSectors": [
+        {"Position": 1, "Value": "27.782"},
+        {"Position": 3, "Value": "28.540"},
+        {"Position": 1, "Value": "22.906"},
+    ]}}})
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    assert ver.best_sector_1_time == 27.782
+    assert ver.best_sector_2_time == 28.540
+    assert ver.best_sector_3_time == 22.906
+    ham = next(d for d in state.drivers if d.abbreviation == "HAM")
+    assert ham.best_sector_1_time is None  # no stats line for 44
+
+
+def test_session_state_from_live_tree_parses_speed_traps():
+    tree = _tree()
+    tree["TimingData"]["Lines"]["1"]["Speeds"] = {
+        "I1": {"Value": "209"}, "I2": {"Value": "123"},
+        "FL": {"Value": "264"}, "ST": {"Value": ""},  # ST not set yet
+    }
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    assert ver.speed_i1 == 209
+    assert ver.speed_i2 == 123
+    assert ver.speed_fl == 264
+    assert ver.speed_st is None  # empty string -> None
+
+
+def test_session_state_from_live_tree_quali_interval_falls_back_to_time_diffs():
+    # Practice/quali feeds omit GapToLeader/IntervalToPositionAhead and expose
+    # TimeDiffToFastest / TimeDiffToPositionAhead instead.
+    tree = _tree()
+    line = tree["TimingData"]["Lines"]["44"]
+    del line["GapToLeader"]
+    line["TimeDiffToFastest"] = "+0.312"
+    line["TimeDiffToPositionAhead"] = "+0.150"
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    ham = next(d for d in state.drivers if d.abbreviation == "HAM")
+    assert ham.gap_to_leader == 0.312
+    assert ham.gap_to_ahead == 0.150
+
+
+def test_session_state_survives_index_keyed_sector_patch():
+    # Reproduces the live crash: a merge-patched tree carries Sectors as an
+    # index-keyed dict. With the merge fix it stays a list; guard here that
+    # parsing never raises regardless.
+    tree = _tree()
+    tree["TimingData"]["Lines"]["1"]["Sectors"] = {
+        "0": {"Value": "27.9"}, "1": {"Value": "31.5"}, "2": {"Value": "22.1"},
+    }
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    # dict form isn't a list, so sector parsing safely yields None rather than crashing
+    assert ver.sector_1_time is None
+
+
 def test_session_state_from_live_tree_uses_latest_stint_for_tire():
     state = session_state_from_live_tree(_tree(), datetime.now(timezone.utc))
     ver = next(d for d in state.drivers if d.abbreviation == "VER")

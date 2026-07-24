@@ -73,10 +73,12 @@ test("qualifyingMode unset still renders the gap-to-leader value", () => {
   expect(screen.getByText("+1.234")).toBeInTheDocument();
 });
 
-test("qualifyingMode hides gap-to-leader and shows best lap / sector times", () => {
+test("qualifyingMode relabels the gap column and still shows the interval to fastest", () => {
   render(<TimingTower state={gapState} selectedDriver={null} onSelectDriver={vi.fn()} qualifyingMode />);
+  // In quali/practice the "gap" is the interval to the session's fastest lap.
+  expect(screen.getByText("To Fastest")).toBeInTheDocument();
   expect(screen.queryByText("Gap")).not.toBeInTheDocument();
-  expect(screen.queryByText("+1.234")).not.toBeInTheDocument(); // gap-to-leader hidden
+  expect(screen.getByText("+1.234")).toBeInTheDocument(); // gap-to-fastest shown
   expect(screen.getByText("90.100")).toBeInTheDocument(); // fastest best lap
   expect(screen.getByText("28.111")).toBeInTheDocument(); // a sector time
 });

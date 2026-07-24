@@ -57,6 +57,18 @@ class DriverState(BaseModel):
     sector_1_time: float | None = None
     sector_2_time: float | None = None
     sector_3_time: float | None = None
+    # each driver's best sector times across the session (from TimingStats), used
+    # for the qualifying/practice best-lap sector view. None until a lap is set.
+    best_sector_1_time: float | None = None
+    best_sector_2_time: float | None = None
+    best_sector_3_time: float | None = None
+    # speed-trap readings (km/h) at fixed track points: I1/I2 intermediates,
+    # FL finish line, ST speed trap. From TimingData.Speeds (available live even
+    # without the paywalled CarData.z channel). None until the car passes each point.
+    speed_i1: float | None = None
+    speed_i2: float | None = None
+    speed_fl: float | None = None
+    speed_st: float | None = None
     # per-segment mini-sector status ("purple"/"green"/"yellow"/"none"), grouped by
     # macro sector: micro_sectors[0] = S1's segments, [1] = S2's, [2] = S3's
     micro_sectors: list[list[str]] = []

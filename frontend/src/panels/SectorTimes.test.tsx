@@ -10,13 +10,16 @@ function driver(
   s2: number,
   s3: number,
   microSectors: string[][] = [],
+  overrides: Partial<SessionState["drivers"][number]> = {},
 ): SessionState["drivers"][number] {
   return {
     driver_number: num, abbreviation: abbr, team: "Team", position: 1,
     gap_to_leader: null, gap_to_ahead: null, last_lap_time: null, best_lap_time: null,
     tire: { compound: "SOFT", age_laps: 1 }, x: null, y: null,
     lap_number: 5, sector_1_time: s1, sector_2_time: s2, sector_3_time: s3,
+    best_sector_1_time: null, best_sector_2_time: null, best_sector_3_time: null,
     micro_sectors: microSectors, flying_lap: null, speed: null, throttle: null, brake: null, gear: null, rpm: null, drs: null,
+    ...overrides,
   };
 }
 
@@ -43,6 +46,28 @@ test("marks the session-best sector time cell", () => {
   };
   render(<SectorTimes state={state} />);
   expect(screen.getByTestId("sector1-best-44")).toBeInTheDocument();
+});
+
+test("qualifyingMode shows best sector times plus gap and interval", () => {
+  const state: SessionState = {
+    timestamp: "t1", track_status: "green",
+    drivers: [
+      driver("1", "VER", 28.0, 32.0, 31.0, [], {
+        best_sector_1_time: 27.5, best_sector_2_time: 31.8, best_sector_3_time: 30.9,
+        gap_to_leader: 0, gap_to_ahead: 0,
+      }),
+      driver("44", "HAM", 28.5, 31.5, 31.2, [], {
+        best_sector_1_time: 27.9, best_sector_2_time: 31.6, best_sector_3_time: 31.0,
+        gap_to_leader: 0.312, gap_to_ahead: 0.150,
+      }),
+    ],
+    weather: null, race_control_messages: [], team_radio: [],
+  };
+  render(<SectorTimes state={state} qualifyingMode />);
+  expect(screen.getByText("27.500")).toBeInTheDocument(); // VER best S1, not current 28.000
+  expect(screen.queryByText("28.000")).not.toBeInTheDocument(); // current sectors hidden
+  expect(screen.getByText("+0.312")).toBeInTheDocument(); // gap column present
+  expect(screen.getByText("+0.150")).toBeInTheDocument(); // interval column present
 });
 
 test("shows a placeholder when there is no state yet", () => {

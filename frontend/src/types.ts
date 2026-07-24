@@ -37,6 +37,13 @@ export interface DriverState {
   sector_1_time: number | null;
   sector_2_time: number | null;
   sector_3_time: number | null;
+  best_sector_1_time: number | null;
+  best_sector_2_time: number | null;
+  best_sector_3_time: number | null;
+  speed_i1: number | null;
+  speed_i2: number | null;
+  speed_fl: number | null;
+  speed_st: number | null;
   micro_sectors: string[][];
   flying_lap: boolean | null;
   speed: number | null;
