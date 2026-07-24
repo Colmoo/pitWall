@@ -129,9 +129,10 @@ async def _start_ai_notes_loop() -> None:
     asyncio.create_task(_ai_notes_loop())
 
 
-async def _run_replay(states, speed: float) -> None:
+async def _run_replay(states, speed: float, session_type: str | None = None) -> None:
     engine = ReplayEngine(states, speed=speed)
     async for state in engine.stream():
+        state.session_type = session_type
         await _publish_state(state)
 
 
@@ -140,7 +141,7 @@ async def start_replay(req: ReplayRequest):
     states = load_session_states(
         year=req.year, event=req.event, session_type=req.session_type, cache_dir=CACHE_DIR,
     )
-    _start_session_task(_run_replay(states, req.speed))
+    _start_session_task(_run_replay(states, req.speed, req.session_type))
     return {"status": "started", "states": len(states)}
 
 
@@ -186,7 +187,11 @@ async def _run_live(sse_url: str) -> None:
     _live_circuit_info_key = None
     adapter = LiveAdapter(sse_url)
     async for state in adapter.stream():
-        _maybe_start_live_circuit_info_lookup(getattr(adapter, "last_tree", {}))
+        tree = getattr(adapter, "last_tree", {})
+        _maybe_start_live_circuit_info_lookup(tree)
+        identity = resolve_fastf1_session_identity(tree)
+        if identity is not None:
+            state.session_type = identity[2]
         await _publish_state(state)
 
 

@@ -25,6 +25,7 @@ export interface DriverState {
   abbreviation: string;
   team: string;
   position: number;
+  status: "running" | "out";
   gap_to_leader: number | null;
   gap_to_ahead: number | null;
   last_lap_time: number | null;
@@ -55,6 +56,7 @@ export interface TeamRadioClip {
 export interface SessionState {
   timestamp: string;
   track_status: TrackStatus;
+  session_type?: string | null;
   drivers: DriverState[];
   weather: WeatherSnapshot | null;
   race_control_messages: RaceControlMessage[];

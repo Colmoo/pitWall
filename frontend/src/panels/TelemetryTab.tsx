@@ -39,16 +39,26 @@ function TelemetryFetcher({
 type ZoomDomain = { start: number; end: number };
 const FULL_DOMAIN: ZoomDomain = { start: 0, end: 1 };
 
-// Points for one trace, sliced to the visible zoom domain and rescaled to fill the chart width.
-function domainPoints(values: number[], max: number, domain: ZoomDomain, width: number, height: number) {
+// Points for one trace, positioned by distance-into-lap (not sample index) so
+// traces with different sample counts still line up at the same track
+// position, then sliced to the visible zoom domain and rescaled to fill the
+// chart width.
+function domainPoints(
+  distances: number[],
+  values: number[],
+  maxDistance: number,
+  max: number,
+  domain: ZoomDomain,
+  width: number,
+  height: number,
+) {
   if (values.length === 0) return "";
   if (values.length === 1) return `0,${(height - (values[0] / max) * height).toFixed(2)}`;
-  const lastIndex = values.length - 1;
-  const startIdx = domain.start * lastIndex;
-  const endIdx = domain.end * lastIndex;
-  const span = endIdx - startIdx || 1;
+  const startD = domain.start * maxDistance;
+  const endD = domain.end * maxDistance;
+  const span = endD - startD || 1;
   return values
-    .map((v, i) => `${(((i - startIdx) / span) * width).toFixed(2)},${(height - (v / max) * height).toFixed(2)}`)
+    .map((v, i) => `${(((distances[i] - startD) / span) * width).toFixed(2)},${(height - (v / max) * height).toFixed(2)}`)
     .join(" ");
 }
 
@@ -59,6 +69,7 @@ function OverlayTrace({
   tracesById,
   metric,
   max,
+  maxDistance,
   yLabels,
   domain,
   onZoom,
@@ -69,6 +80,7 @@ function OverlayTrace({
   tracesById: Record<string, Traces | null>;
   metric: (traces: Traces) => number[];
   max: number;
+  maxDistance: number;
   yLabels?: [string, string];
   domain: ZoomDomain;
   onZoom: (domain: ZoomDomain) => void;
@@ -126,7 +138,7 @@ function OverlayTrace({
         {selections.map((s) => {
           const traces = tracesById[s.id];
           if (!traces) return null;
-          const points = domainPoints(metric(traces), max, domain, width, height);
+          const points = domainPoints(traces.distance, metric(traces), maxDistance, max, domain, width, height);
           return <polyline key={s.id} points={points} fill="none" stroke={s.color} strokeWidth={2} vectorEffect="non-scaling-stroke" />;
         })}
         {dragStart !== null && dragX !== null && (
@@ -186,6 +198,7 @@ export function TelemetryTab({
   const speedMax = Math.max(1, ...selections.flatMap((s) => tracesById[s.id]?.speed ?? []));
   const gearMax = Math.max(1, ...selections.flatMap((s) => tracesById[s.id]?.gear ?? []));
   const rpmMax = Math.max(1, ...selections.flatMap((s) => tracesById[s.id]?.rpm ?? []));
+  const maxDistance = Math.max(1, ...selections.flatMap((s) => tracesById[s.id]?.distance ?? []));
 
   return (
     <WidgetGrid storageKey="pitwall-telemetry-layout" defaultLayout={TELEMETRY_DEFAULT_LAYOUT}>
@@ -229,7 +242,7 @@ export function TelemetryTab({
           <button type="button" onClick={() => setZoomDomain(FULL_DOMAIN)} disabled={zoomDomain.start === 0 && zoomDomain.end === 1}>
             Reset view
           </button>
-          <span className="pitwall-stat-label">Click and drag on a chart to zoom</span>
+          <span className="pitwall-stat-label">X axis: distance into lap (m) — click and drag on a chart to zoom</span>
         </div>
         <OverlayTrace
           testId="telemetry-overlay-speed"
@@ -238,6 +251,7 @@ export function TelemetryTab({
           tracesById={tracesById}
           metric={(t) => t.speed}
           max={speedMax}
+          maxDistance={maxDistance}
           domain={zoomDomain}
           onZoom={setZoomDomain}
         />
@@ -248,6 +262,7 @@ export function TelemetryTab({
           tracesById={tracesById}
           metric={(t) => t.throttle}
           max={100}
+          maxDistance={maxDistance}
           domain={zoomDomain}
           onZoom={setZoomDomain}
         />
@@ -258,6 +273,7 @@ export function TelemetryTab({
           tracesById={tracesById}
           metric={(t) => t.brake.map((b) => (b ? 1 : 0))}
           max={1}
+          maxDistance={maxDistance}
           yLabels={["On", "Off"]}
           domain={zoomDomain}
           onZoom={setZoomDomain}
@@ -269,6 +285,7 @@ export function TelemetryTab({
           tracesById={tracesById}
           metric={(t) => t.gear}
           max={gearMax}
+          maxDistance={maxDistance}
           domain={zoomDomain}
           onZoom={setZoomDomain}
         />
@@ -279,6 +296,7 @@ export function TelemetryTab({
           tracesById={tracesById}
           metric={(t) => t.rpm}
           max={rpmMax}
+          maxDistance={maxDistance}
           domain={zoomDomain}
           onZoom={setZoomDomain}
         />

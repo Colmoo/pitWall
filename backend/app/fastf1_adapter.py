@@ -4,6 +4,7 @@ import fastf1
 import numpy as np
 import pandas as pd
 
+from app.live_adapter import _TRACK_STATUS_CODES
 from app.schema import DriverState, RaceControlMessage, SessionState, Tire, TrackStatus, WeatherSnapshot
 
 
@@ -97,7 +98,7 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
         states.append(
             SessionState(
                 timestamp=session_start + row["Time"],
-                # ponytail: track status omitted in replay v1, defaults to green.
+                # overwritten by attach_track_status once real flag data is available.
                 track_status=TrackStatus.GREEN,
                 drivers=[pair[0] for pair in entries],
             )
@@ -136,6 +137,21 @@ def attach_weather(states: list[SessionState], weather_data: pd.DataFrame, sessi
     for state in states:
         elapsed = state.timestamp - session_start
         state.weather = nearest_weather_sample(weather_data, elapsed)
+
+
+def attach_track_status(states: list[SessionState], track_status_data: "pd.DataFrame", session_start: datetime) -> None:
+    if track_status_data is None or track_status_data.empty:
+        return
+    events = track_status_data.sort_values("Time")
+    times = events["Time"].values
+    codes = events["Status"].tolist()
+    for state in states:
+        elapsed = pd.Timestamp(state.timestamp) - pd.Timestamp(session_start)
+        # last flag event at or before this state's time, not the nearest one -
+        # a flag stays in effect until the next event changes it.
+        idx = int(np.searchsorted(times, pd.Timedelta(elapsed).to_timedelta64(), side="right")) - 1
+        if idx >= 0:
+            state.track_status = _TRACK_STATUS_CODES.get(str(codes[idx]), TrackStatus.GREEN)
 
 
 def _nearest_position(driver_pos: "pd.DataFrame", elapsed: "pd.Timedelta") -> tuple[float, float] | None:
@@ -188,12 +204,46 @@ def attach_car_positions(
         next_elapsed = pd.Timestamp(states[i + 1].timestamp) - pd.Timestamp(session_start)
         tick = elapsed + step
         while tick < next_elapsed:
-            snapshot = state.model_copy(deep=True)
-            snapshot.timestamp = session_start + tick
+            # ponytail: only x/y change per tick, so shallow-copy the state and
+            # its drivers (sharing tire/weather/telemetry by reference) instead
+            # of a deep copy of all 20 drivers' full data. Fresh driver objects
+            # are needed because _attach_positions_at mutates x/y in place - the
+            # originals (already emitted) must stay untouched.
+            tick_drivers = [driver.model_copy() for driver in state.drivers]
+            snapshot = state.model_copy(update={"drivers": tick_drivers, "timestamp": session_start + tick})
             _attach_positions_at(snapshot, sorted_positions, tick)
             expanded.append(snapshot)
             tick += step
     return expanded
+
+
+# Statuses FastF1's session.results uses for classified finishers - anything
+# else (Retired, Accident, Disqualified, Did not start, ...) means the driver
+# is out of the race for the remainder of the replay.
+_FINISHED_STATUS_PREFIXES = ("Finished", "+")
+
+
+def attach_retirements(states: list[SessionState], laps: pd.DataFrame, results: "pd.DataFrame", session_start: datetime) -> None:
+    if results is None or results.empty or "Status" not in results.columns:
+        return
+    last_lap_time = laps.groupby("DriverNumber")["Time"].max()
+    retired_cutoff: dict[str, datetime] = {}
+    for _, row in results.iterrows():
+        status = str(row.get("Status", ""))
+        if status.startswith(_FINISHED_STATUS_PREFIXES):
+            continue
+        number = str(row["DriverNumber"])
+        cutoff = last_lap_time.get(number)
+        if cutoff is not None and not pd.isna(cutoff):
+            retired_cutoff[number] = session_start + cutoff
+
+    if not retired_cutoff:
+        return
+    for state in states:
+        for driver in state.drivers:
+            cutoff = retired_cutoff.get(driver.driver_number)
+            if cutoff is not None and state.timestamp > cutoff:
+                driver.status = "out"
 
 
 def race_control_messages_up_to(rcm: pd.DataFrame, timestamp: datetime) -> list[RaceControlMessage]:
@@ -389,12 +439,26 @@ def load_session_states(year: int, event: str, session_type: str, cache_dir: str
     # lap "Time" deltas, which is accurate enough for display purposes.
     session_start = session.date.to_pydatetime()
     laps = session.laps
-    if laps["Position"].isna().all():
+    if laps["Position"].isna().any():
+        # Real races can leave Position NaN for just the opening lap(s) while
+        # FastF1's timing system settles after the start, not only the
+        # all-NaN FP/Q case - fill gaps instead of dropping those laps
+        # entirely (see session_states_from_laps' NaN-Position skip).
         laps = laps.copy()
-        laps["Position"] = _synthesize_positions(laps)
+        laps["Position"] = laps["Position"].fillna(_synthesize_positions(laps))
     states = session_states_from_laps(laps, session_start)
     attach_weather(states, session.weather_data, session_start)
     attach_race_control_messages(states, session.race_control_messages)
+    try:
+        track_status_data = session.track_status
+    except (fastf1.core.DataNotLoadedError, AttributeError):
+        track_status_data = None
+    attach_track_status(states, track_status_data, session_start)
+    try:
+        results = session.results
+    except (fastf1.core.DataNotLoadedError, AttributeError):
+        results = None
+    attach_retirements(states, laps, results, session_start)
     try:
         pos_data = session.pos_data
     except fastf1.core.DataNotLoadedError:

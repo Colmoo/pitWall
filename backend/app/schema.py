@@ -43,6 +43,9 @@ class DriverState(BaseModel):
     abbreviation: str
     team: str
     position: int
+    # "running" or "out" (retired/DNF/DNS/DSQ) - drives the "OUT" display in the
+    # timing tower instead of a stale position number.
+    status: str = "running"
     gap_to_leader: float | None = None
     gap_to_ahead: float | None = None
     last_lap_time: float | None = None
@@ -72,6 +75,9 @@ class DriverState(BaseModel):
 class SessionState(BaseModel):
     timestamp: datetime
     track_status: TrackStatus
+    # FastF1/live session identifier ("FP1"/"FP2"/"FP3"/"Q"/"SQ"/"S"/"R"); drives
+    # the frontend's auto qualifying-view detection. None until resolved.
+    session_type: str | None = None
     drivers: list[DriverState]
     weather: WeatherSnapshot | None = None
     race_control_messages: list[RaceControlMessage] = []

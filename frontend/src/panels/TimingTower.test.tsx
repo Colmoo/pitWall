@@ -60,6 +60,27 @@ test("shows a push/in-out badge per driver based on flying_lap", () => {
   expect(screen.getByText("IN/OUT")).toBeInTheDocument();
 });
 
+const gapState: SessionState = {
+  ...sampleState,
+  drivers: [
+    { ...sampleState.drivers[0], gap_to_leader: 0, gap_to_ahead: 0, sector_1_time: 28.111 },
+    { ...sampleState.drivers[1], gap_to_leader: 1.234, gap_to_ahead: 0.5, sector_1_time: 28.222 },
+  ],
+};
+
+test("qualifyingMode unset still renders the gap-to-leader value", () => {
+  render(<TimingTower state={gapState} selectedDriver={null} onSelectDriver={vi.fn()} />);
+  expect(screen.getByText("+1.234")).toBeInTheDocument();
+});
+
+test("qualifyingMode hides gap-to-leader and shows best lap / sector times", () => {
+  render(<TimingTower state={gapState} selectedDriver={null} onSelectDriver={vi.fn()} qualifyingMode />);
+  expect(screen.queryByText("Gap")).not.toBeInTheDocument();
+  expect(screen.queryByText("+1.234")).not.toBeInTheDocument(); // gap-to-leader hidden
+  expect(screen.getByText("90.100")).toBeInTheDocument(); // fastest best lap
+  expect(screen.getByText("28.111")).toBeInTheDocument(); // a sector time
+});
+
 test("toggling fastest lap only emphasizes the best lap column", () => {
   render(<TimingTower state={sampleState} selectedDriver={null} onSelectDriver={vi.fn()} />);
   const toggle = screen.getByLabelText(/fastest lap only/i);

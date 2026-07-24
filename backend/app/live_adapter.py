@@ -1,4 +1,6 @@
+import base64
 import json
+import zlib
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
@@ -126,20 +128,40 @@ def _parse_flying_lap(timing: dict) -> bool | None:
     return None
 
 
-def _latest_position_entries(tree: dict) -> dict:
-    snapshots = tree.get("Position")
-    if not isinstance(snapshots, list) or not snapshots:
+def _inflate_z(value) -> dict:
+    """Decode an F1 live-timing '.z' payload (base64 + raw DEFLATE) to a dict. Returns {} on any failure."""
+    if not isinstance(value, str) or not value:
         return {}
-    latest = snapshots[-1]
+    try:
+        return json.loads(zlib.decompress(base64.b64decode(value), -zlib.MAX_WBITS))
+    except Exception:
+        return {}
+
+
+def _latest_position_entries(tree: dict) -> dict:
+    # Position.z is the real (compressed) topic; fall back to an uncompressed
+    # Position list if present. Decoded shape: {"Position": [ {"Entries": {...}}, ... ]}
+    decoded = _inflate_z(tree.get("Position.z"))
+    ticks = decoded.get("Position") if decoded else tree.get("Position")
+    if not isinstance(ticks, list) or not ticks:
+        return {}
+    latest = ticks[-1]
     return latest.get("Entries", {}) if isinstance(latest, dict) else {}
 
 
 def _latest_car_data_entries(tree: dict) -> dict:
-    snapshots = tree.get("CarData")
-    if not isinstance(snapshots, list) or not snapshots:
+    # CarData.z is the real (compressed) topic; fall back to an uncompressed
+    # CarData list if present. Decoded shape: {"Entries": [ {"Cars": {...}}, ... ]}
+    # (compressed nests drivers under "Cars"; uncompressed fallback uses "Entries").
+    decoded = _inflate_z(tree.get("CarData.z"))
+    if decoded:
+        ticks, driver_key = decoded.get("Entries"), "Cars"
+    else:
+        ticks, driver_key = tree.get("CarData"), "Entries"
+    if not isinstance(ticks, list) or not ticks:
         return {}
-    latest = snapshots[-1]
-    return latest.get("Entries", {}) if isinstance(latest, dict) else {}
+    latest = ticks[-1]
+    return latest.get(driver_key, {}) if isinstance(latest, dict) else {}
 
 
 def _parse_weather(tree: dict) -> WeatherSnapshot | None:
@@ -222,6 +244,10 @@ def session_state_from_live_tree(tree: dict, timestamp: datetime) -> SessionStat
                     abbreviation=driver_info.get("Tla", number),
                     team=driver_info.get("TeamName", ""),
                     position=int(position),
+                    # ponytail: "Retired"/"Stopped" booleans follow the same
+                    # publicly-documented live-timing schema assumed elsewhere in
+                    # this file - not yet verified against a real live stream.
+                    status="out" if (timing.get("Retired") or timing.get("Stopped")) else "running",
                     gap_to_leader=_parse_gap(timing.get("GapToLeader")),
                     gap_to_ahead=_parse_gap(timing.get("IntervalToPositionAhead", {}).get("Value")),
                     last_lap_time=_parse_lap_time(timing.get("LastLapTime", {}).get("Value")),

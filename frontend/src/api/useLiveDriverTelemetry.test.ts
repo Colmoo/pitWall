@@ -4,7 +4,7 @@ import type { SessionState, DriverState } from "../types";
 
 function driver(overrides: Partial<DriverState>): DriverState {
   return {
-    driver_number: "1", abbreviation: "VER", team: "Red Bull Racing", position: 1,
+    driver_number: "1", abbreviation: "VER", team: "Red Bull Racing", position: 1, status: "running",
     gap_to_leader: null, gap_to_ahead: null, last_lap_time: null, best_lap_time: null,
     tire: { compound: "SOFT", age_laps: 1 }, x: null, y: null, lap_number: null,
     sector_1_time: null, sector_2_time: null, sector_3_time: null, micro_sectors: [],

@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from "react";
 import type { SessionState } from "../types";
-import { tireColor } from "../constants";
+import { formatGap, tireColor } from "../constants";
 
 export function SelectedDriverCard({
   state,
@@ -9,6 +10,23 @@ export function SelectedDriverCard({
   selectedDriver: string | null;
 }) {
   const driver = state?.drivers.find((d) => d.driver_number === selectedDriver) ?? null;
+  const lapNumber = driver?.lap_number ?? null;
+
+  // Running current-lap clock: reset when the driver or their lap changes, then
+  // tick every 100ms so the card shows the lap time as it's happening.
+  // ponytail: wall-clock since lap start assumes ~1x playback; drifts at other
+  // replay speeds. Upgrade path: base it on state.timestamp deltas if that matters.
+  const lapStartRef = useRef<number>(Date.now());
+  const [nowTick, setNowTick] = useState<number>(Date.now());
+  useEffect(() => {
+    lapStartRef.current = Date.now();
+    setNowTick(Date.now());
+  }, [selectedDriver, lapNumber]);
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 100);
+    return () => clearInterval(id);
+  }, []);
+  const runningLap = driver && driver.status !== "out" ? (nowTick - lapStartRef.current) / 1000 : null;
 
   if (!driver) {
     return <p>Select a driver to see details.</p>;
@@ -19,17 +37,23 @@ export function SelectedDriverCard({
     .reverse();
 
   return (
-    <div>
+    <div style={driver.status === "out" ? { opacity: 0.4 } : undefined}>
       <div className="pitwall-stat">
         <div className="pitwall-stat-label">Driver</div>
         <div className="pitwall-stat-value cyan">
-          <span>{driver.abbreviation}</span> · P{driver.position}
+          <span>{driver.abbreviation}</span> · {driver.status === "out" ? "OUT" : `P${driver.position}`}
         </div>
       </div>
       <div className="pitwall-stat">
         <div className="pitwall-stat-label">Tire</div>
         <div className="pitwall-stat-value" style={{ color: tireColor(driver.tire.compound) }}>
           {driver.tire.compound} ({driver.tire.age_laps})
+        </div>
+      </div>
+      <div className="pitwall-stat">
+        <div className="pitwall-stat-label">Current Lap</div>
+        <div className="pitwall-stat-value cyan" data-testid="current-lap-time">
+          {runningLap !== null ? runningLap.toFixed(1) : "-"}
         </div>
       </div>
       <div className="pitwall-stat">
@@ -43,13 +67,13 @@ export function SelectedDriverCard({
       <div className="pitwall-stat">
         <div className="pitwall-stat-label">Gap to Leader</div>
         <div className="pitwall-stat-value">
-          {driver.gap_to_leader !== null ? `+${driver.gap_to_leader.toFixed(3)}` : "-"}
+          {formatGap(driver.gap_to_leader)}
         </div>
       </div>
       <div className="pitwall-stat">
         <div className="pitwall-stat-label">Gap Ahead</div>
         <div className="pitwall-stat-value">
-          {driver.gap_to_ahead !== null ? `+${driver.gap_to_ahead.toFixed(3)}` : "-"}
+          {formatGap(driver.gap_to_ahead)}
         </div>
       </div>
       {driver.speed !== null && (

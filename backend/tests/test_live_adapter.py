@@ -1,7 +1,17 @@
+import base64
+import json
+import zlib
 from datetime import datetime, timezone
 
 import httpx
 import pytest
+
+
+def _compress_z(d: dict) -> str:
+    """Produce an F1 '.z' payload: base64 of raw (headerless) DEFLATE."""
+    co = zlib.compressobj(9, zlib.DEFLATED, -zlib.MAX_WBITS)
+    raw = co.compress(json.dumps(d).encode()) + co.flush()
+    return base64.b64encode(raw).decode()
 
 from app.live_adapter import LiveAdapter, resolve_fastf1_session_identity, session_state_from_live_tree
 from app.schema import TrackStatus
@@ -179,6 +189,42 @@ def test_session_state_from_live_tree_parses_latest_car_data_channels():
     assert ver.throttle == 100
     assert ver.brake is False
     assert ver.drs is True
+
+
+def test_session_state_from_live_tree_parses_compressed_position_z():
+    payload = _compress_z({"Position": [
+        {"Timestamp": "t0", "Entries": {"1": {"Status": "OnTrack", "X": 100, "Y": 200, "Z": 5}}},
+        {"Timestamp": "t1", "Entries": {"1": {"Status": "OnTrack", "X": 111, "Y": 222, "Z": 5}}},
+    ]})
+    state = session_state_from_live_tree(_tree(**{"Position.z": payload}), datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    assert ver.x == 111
+    assert ver.y == 222
+
+
+def test_session_state_from_live_tree_parses_compressed_car_data_z():
+    payload = _compress_z({"Entries": [
+        {"Utc": "t0", "Cars": {"1": {"Channels": {"0": 5000, "2": 100, "3": 3, "4": 20, "5": 1, "45": 0}}}},
+        {"Utc": "t1", "Cars": {"1": {"Channels": {"0": 11000, "2": 310, "3": 7, "4": 100, "5": 0, "45": 12}}}},
+    ]})
+    state = session_state_from_live_tree(_tree(**{"CarData.z": payload}), datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    assert ver.rpm == 11000
+    assert ver.speed == 310
+    assert ver.gear == 7
+    assert ver.throttle == 100
+    assert ver.brake is False
+    assert ver.drs is True
+
+
+def test_session_state_from_live_tree_malformed_z_yields_none_telemetry():
+    tree = _tree(**{"Position.z": "not-valid-base64!!!", "CarData.z": "%%%"})
+    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+    ver = next(d for d in state.drivers if d.abbreviation == "VER")
+    assert ver.x is None
+    assert ver.y is None
+    assert ver.speed is None
+    assert ver.gear is None
 
 
 def test_session_state_from_live_tree_parses_micro_sectors():

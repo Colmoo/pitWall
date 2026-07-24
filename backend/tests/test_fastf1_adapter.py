@@ -6,7 +6,8 @@ import pytest
 
 import fastf1
 
-from app.fastf1_adapter import attach_car_positions, attach_weather, attach_race_control_messages, list_events_for_year, list_sessions_for_event, list_supported_years, load_driver_lap_telemetry, load_session_states, load_track_layout, session_states_from_laps, track_layout_from_telemetry, _synthesize_positions
+from app.fastf1_adapter import attach_car_positions, attach_weather, attach_race_control_messages, attach_track_status, list_events_for_year, list_sessions_for_event, list_supported_years, load_driver_lap_telemetry, load_session_states, load_track_layout, session_states_from_laps, track_layout_from_telemetry, _synthesize_positions
+from app.schema import TrackStatus
 
 
 def _laps_df():
@@ -126,6 +127,30 @@ def test_load_session_states_falls_back_to_synthesized_positions(monkeypatch):
     states = load_session_states(year=2026, event="Test GP", session_type="FP1", cache_dir="/tmp")
     assert len(states) == 4
     assert all(d.position is not None for s in states for d in s.drivers)
+
+
+def test_load_session_states_fills_partial_nan_positions_in_race(monkeypatch):
+    # Regression test: real races can leave Position NaN for just the opening
+    # lap(s) (timing system settling after the start) while later laps have
+    # real Position - this used to only get filled when the *whole* column
+    # was NaN (FP/Q), so those opening laps were silently dropped and replay
+    # appeared to start partway into the race.
+    laps, session_start = _laps_df()
+    laps.loc[laps["LapNumber"] == 1, "Position"] = np.nan
+
+    class FakeSession:
+        def __init__(self):
+            self.laps = laps
+            self.date = pd.Timestamp(session_start)
+            self.weather_data = pd.DataFrame(columns=["Time", "AirTemp", "TrackTemp", "Humidity", "WindSpeed", "Rainfall"])
+            self.race_control_messages = pd.DataFrame(columns=["Time", "Category", "Message", "Flag"])
+            self.pos_data = {}
+
+    monkeypatch.setattr("app.fastf1_adapter.get_or_load_session", lambda *args, **kwargs: FakeSession())
+    states = load_session_states(year=2026, event="Test GP", session_type="R", cache_dir="/tmp")
+    assert len(states) == 4
+    lap1_drivers = {d.abbreviation for d in states[0].drivers}
+    assert lap1_drivers == {"VER"}
 
 
 def test_session_states_from_laps_carries_forward_driver_skipped_from_early_state():
@@ -386,6 +411,30 @@ def test_attach_weather_handles_empty_weather_data():
     assert states[0].weather is None
 
 
+def test_attach_track_status_applies_flag_in_effect_at_each_state():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    track_status_data = pd.DataFrame([
+        dict(Time=timedelta(seconds=0), Status="1"),
+        dict(Time=timedelta(seconds=95), Status="2"),  # yellow flag right after HAM's lap 1 (93s)
+        dict(Time=timedelta(seconds=182), Status="4"),  # SC right before VER's lap 2 (182s)
+    ])
+
+    attach_track_status(states, track_status_data, session_start)
+
+    assert states[0].track_status == TrackStatus.GREEN  # VER lap1 @ 92s, before the yellow
+    assert states[1].track_status == TrackStatus.GREEN  # HAM lap1 @ 93s, still before the yellow
+    assert states[2].track_status == TrackStatus.SC  # VER lap2 @ 182s, at the SC event
+    assert states[3].track_status == TrackStatus.SC  # HAM lap2 @ 184.5s, still under SC
+
+
+def test_attach_track_status_handles_empty_data():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    attach_track_status(states, pd.DataFrame(columns=["Time", "Status"]), session_start)
+    assert all(s.track_status == TrackStatus.GREEN for s in states)
+
+
 def test_attach_race_control_messages_only_includes_messages_up_to_timestamp():
     laps, session_start = _laps_df()
     states = session_states_from_laps(laps, session_start)
@@ -551,6 +600,44 @@ def test_attach_car_positions_inserts_ticks_between_lap_events_for_smooth_moveme
     # inserted ticks carry forward the last lap-event's timing/gap data untouched.
     mid = expanded[1]
     assert mid.drivers[0].lap_number == states[0].drivers[0].lap_number
+
+
+def test_attach_car_positions_shallow_copy_interpolates_without_corrupting_originals():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+
+    # VER moving straight along X, sampled every second so the nearest-sample x
+    # at any (integer) tick time equals that time exactly - lets us assert the
+    # interpolated position precisely.
+    ver_pos = pd.DataFrame({
+        "Time": [timedelta(seconds=s) for s in range(0, 200)],
+        "X": [float(s) for s in range(0, 200)],
+        "Y": [0.0 for _ in range(0, 200)],
+    })
+    original_states = list(states)  # identities of the lap-event states
+    expanded = attach_car_positions(states, {"1": ver_pos}, session_start, tick_seconds=10.0)
+
+    def ver(state):
+        return next(d for d in state.drivers if d.driver_number == "1")
+
+    # Every state (original or inserted tick) carries its OWN interpolated x for
+    # its own timestamp - proving inserted ticks weren't just a stale copy of the
+    # previous state's position (the shallow copy still gives each tick fresh x/y).
+    for state in expanded:
+        elapsed = (pd.Timestamp(state.timestamp) - pd.Timestamp(session_start)).total_seconds()
+        # nearest 1s telemetry sample => within half a second of the true time.
+        assert abs(ver(state).x - elapsed) <= 0.5
+
+    # First lap-event state stays put at its own time; later ticks didn't mutate it.
+    assert ver(original_states[0]).x == 92.0
+
+    # Inserted ticks are DISTINCT driver objects (so mutating x/y never corrupted
+    # the originals) yet SHARE unchanged nested data by reference (shallow, not
+    # deep, copy) - that's the whole point of the lighter path.
+    ticks = [s for s in expanded if s not in original_states]
+    assert ticks, "expected intermediate ticks to be inserted"
+    assert all(ver(t) is not ver(original_states[0]) for t in ticks)
+    assert all(ver(t).tire is ver(original_states[0]).tire for t in ticks)
 
 
 def test_attach_car_positions_is_a_noop_when_pos_data_empty():

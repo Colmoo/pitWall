@@ -1,5 +1,5 @@
 import { renderHook, act } from "@testing-library/react";
-import { useSessionSocket } from "./useSessionSocket";
+import { useSessionSocket, HISTORY_CAP } from "./useSessionSocket";
 
 // Batching flushes on requestAnimationFrame; run it synchronously in tests
 // so existing act()-wrapped assertions don't need to await a real frame.
@@ -46,6 +46,25 @@ test("accumulates each received message into history, in order", () => {
   expect(result.current).toHaveLength(2);
   expect(result.current[0].timestamp).toBe("t1");
   expect(result.current[1].timestamp).toBe("t2");
+});
+
+test("caps history to a bounded rolling window, dropping the oldest states", () => {
+  // @ts-expect-error test double
+  global.WebSocket = FakeWebSocket;
+  const { result } = renderHook(() => useSessionSocket("ws://test/ws/session"));
+  const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+
+  const overflow = HISTORY_CAP + 5;
+  act(() => {
+    for (let i = 0; i < overflow; i++) {
+      socket.onmessage?.({ data: JSON.stringify(sampleState(`t${i}`)) });
+    }
+  });
+
+  // never exceeds the cap, and it's the newest states that are kept.
+  expect(result.current).toHaveLength(HISTORY_CAP);
+  expect(result.current[result.current.length - 1].timestamp).toBe(`t${overflow - 1}`);
+  expect(result.current[0].timestamp).toBe(`t${overflow - HISTORY_CAP}`);
 });
 
 test("resets history when resetKey changes, even if url stays the same", () => {

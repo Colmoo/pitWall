@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { TireStrategy } from "./TireStrategy";
 import type { SessionState } from "../types";
@@ -33,6 +33,21 @@ test("splits into multiple stints on a compound change", () => {
   render(<TireStrategy history={history} />);
   expect(screen.getByTestId("stint-1-SOFT-1-2")).toBeInTheDocument();
   expect(screen.getByTestId("stint-1-MEDIUM-3-3")).toBeInTheDocument();
+});
+
+test("keeps early stints after the bounded window rolls past them", () => {
+  const t1 = driverTick(1, "SOFT");
+  const t2 = driverTick(2, "SOFT");
+  const t3 = driverTick(3, "SOFT");
+  const { rerender } = render(<TireStrategy history={[t1, t2]} />);
+  expect(screen.getByTestId("stint-1-SOFT-1-2")).toBeInTheDocument();
+
+  // t1 rolls off the window; t2 stays as the marker, t3 appended.
+  act(() => {
+    rerender(<TireStrategy history={[t2, t3]} />);
+  });
+  // lap 1 survives via the append-only accumulator -> stint spans 1-3.
+  expect(screen.getByTestId("stint-1-SOFT-1-3")).toBeInTheDocument();
 });
 
 test("shows a placeholder when there is no history yet", () => {

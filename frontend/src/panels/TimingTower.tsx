@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { SessionState } from "../types";
-import { teamColor, tireColor } from "../constants";
+import { formatGap, teamColor, tireColor } from "../constants";
 
 function bestSectorDriver(
   drivers: SessionState["drivers"],
@@ -20,10 +20,12 @@ export function TimingTower({
   state,
   selectedDriver,
   onSelectDriver,
+  qualifyingMode = false,
 }: {
   state: SessionState | null;
   selectedDriver: string | null;
   onSelectDriver: (driverNumber: string) => void;
+  qualifyingMode?: boolean;
 }) {
   // ponytail: no reliable data source for which qualifying segment (Q1/Q2/Q3)
   // is currently active or how many cars remain, so elimination-zone cutoff
@@ -63,7 +65,7 @@ export function TimingTower({
         <thead>
           <tr>
             <th>Pos</th><th>Driver</th><th>Tire</th><th>Last Lap</th><th>Best Lap</th>
-            <th>Gap</th><th>Int</th><th>S1</th><th>S2</th><th>S3</th>
+            {!qualifyingMode && <th>Gap</th>}<th>Int</th><th>S1</th><th>S2</th><th>S3</th>
           </tr>
         </thead>
         <tbody>
@@ -73,9 +75,10 @@ export function TimingTower({
               className={
                 "pitwall-row-selectable" + (d.driver_number === selectedDriver ? " pitwall-row-selected" : "")
               }
+              style={d.status === "out" ? { opacity: 0.4 } : undefined}
               onClick={() => onSelectDriver(d.driver_number)}
             >
-              <td>{d.position}</td>
+              <td>{d.status === "out" ? "OUT" : d.position}</td>
               <td>
                 <span className="pitwall-team-stripe" style={{ background: teamColor(d.team) }} />
                 {d.abbreviation}
@@ -99,8 +102,8 @@ export function TimingTower({
               >
                 {d.best_lap_time?.toFixed(3) ?? "-"}
               </td>
-              <td>{d.gap_to_leader !== null ? `+${d.gap_to_leader.toFixed(3)}` : "-"}</td>
-              <td>{d.gap_to_ahead !== null ? `+${d.gap_to_ahead.toFixed(3)}` : "-"}</td>
+              {!qualifyingMode && <td>{formatGap(d.gap_to_leader)}</td>}
+              <td>{formatGap(d.gap_to_ahead)}</td>
               <td style={d.driver_number === bestS1 ? { color: "var(--purple)" } : undefined}>
                 {d.sector_1_time?.toFixed(3) ?? "-"}
               </td>

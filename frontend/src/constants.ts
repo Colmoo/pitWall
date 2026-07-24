@@ -39,3 +39,8 @@ const COMPARISON_COLORS = ["#3ecbff", "#facc15", "#4ade80", "#f87171", "#a78bfa"
 export function comparisonColor(index: number): string {
   return COMPARISON_COLORS[index % COMPARISON_COLORS.length];
 }
+
+export function formatGap(gap: number | null): string {
+  if (gap === null) return "-";
+  return gap >= 0 ? `+${gap.toFixed(3)}` : gap.toFixed(3);
+}

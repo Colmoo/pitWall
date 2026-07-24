@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { GapTrendChart } from "./GapTrendChart";
 import type { SessionState } from "../types";
@@ -31,6 +32,23 @@ test("draws a line for the selected driver's gap history", () => {
 test("shows a placeholder when no driver is selected", () => {
   render(<GapTrendChart history={[]} selectedDriver={null} />);
   expect(screen.getByText(/select a driver/i)).toBeInTheDocument();
+});
+
+test("keeps early-session gaps after they roll off the bounded window", () => {
+  const s1 = stateWithGap(1, 5.0);
+  const s2 = stateWithGap(2, 4.0);
+  const s3 = stateWithGap(3, 3.0);
+  // first window holds laps 1-2.
+  const { rerender } = render(<GapTrendChart history={[s1, s2]} selectedDriver="44" />);
+  expect(screen.getByTestId("gap-trend-line").getAttribute("points")?.trim().split(" ")).toHaveLength(2);
+
+  // window rolls: s1 dropped, s2 retained as the marker, s3 appended.
+  act(() => {
+    rerender(<GapTrendChart history={[s2, s3]} selectedDriver="44" />);
+  });
+  // s1's gap survives via the append-only accumulator -> 3 points, not 2.
+  const coords = screen.getByTestId("gap-trend-line").getAttribute("points")?.trim().split(" ");
+  expect(coords).toHaveLength(3);
 });
 
 test("skips ticks where the gap is unknown", () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { SessionState } from "../types";
 import { teamColor } from "../constants";
 
@@ -124,6 +124,11 @@ export function TrackMap({
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  // ponytail: raw `history` is a bounded rolling window (see useSessionSocket),
+  // so accumulate the traced live outline append-only in a ref keyed on the
+  // last-processed state's identity. Only new states are scanned per render and
+  // the traced circuit survives after early positions roll off the window.
+  const tracedRef = useRef<{ last: SessionState | null; points: LayoutPoint[] }>({ last: null, points: [] });
 
   type TrackLayoutResponse = {
     points: LayoutPoint[];
@@ -184,12 +189,23 @@ export function TrackMap({
   // Live mode has no FastF1 (year/event/session) identifier to fetch a layout
   // with, so trace the circuit from the leader's live x/y positions instead -
   // no separate request, no waiting on a FastF1 session load.
-  const tracedPoints: LayoutPoint[] = sessionParams
-    ? []
-    : history
-        .map((s) => s.drivers.find((d) => d.position === 1) ?? s.drivers[0])
-        .filter((d): d is NonNullable<typeof d> => d != null && d.x != null && d.y != null)
-        .map((d) => [d.x as number, d.y as number]);
+  const tracedPoints: LayoutPoint[] = useMemo(() => {
+    if (sessionParams) return [];
+    const acc = tracedRef.current;
+    let start = 0;
+    if (acc.last !== null) {
+      const found = history.indexOf(acc.last);
+      // marker missing => history reset (or window jumped past it): rebuild.
+      if (found === -1) acc.points = [];
+      else start = found + 1;
+    }
+    for (let i = start; i < history.length; i++) {
+      const d = history[i].drivers.find((dr) => dr.position === 1) ?? history[i].drivers[0];
+      if (d != null && d.x != null && d.y != null) acc.points.push([d.x as number, d.y as number]);
+    }
+    if (history.length > 0) acc.last = history[history.length - 1];
+    return acc.points;
+  }, [history, sessionParams]);
 
   const rawPoints = sessionParams ? fetchedPoints : tracedPoints;
 
@@ -419,31 +435,31 @@ export function TrackMap({
             fill={teamColor(d.team)}
             stroke={d.driver_number === selectedDriver ? "#3ecbff" : "#0a0c10"}
             strokeWidth={width * 0.002}
-            style={{ cursor: onSelectDriver ? "pointer" : undefined }}
+            style={{ cursor: onSelectDriver ? "pointer" : undefined, transition: "cx 0.2s linear, cy 0.2s linear" }}
             onClick={() => onSelectDriver?.(d.driver_number)}
           />
         ))}
         {selected && (
-          <g data-testid="selected-driver-flag">
+          <g data-testid="selected-driver-flag" style={{ transition: "transform 0.2s linear" }} transform={`translate(${selected.plotX}, ${selected.plotY})`}>
             <line
-              x1={selected.plotX}
-              y1={selected.plotY}
-              x2={selected.plotX + width * 0.02}
-              y2={selected.plotY - width * 0.045}
+              x1={0}
+              y1={0}
+              x2={width * 0.02}
+              y2={-width * 0.045}
               stroke="#e5e7eb"
               strokeWidth={width * 0.0015}
             />
             <rect
-              x={selected.plotX + width * 0.015}
-              y={selected.plotY - width * 0.065}
+              x={width * 0.015}
+              y={-width * 0.065}
               width={width * 0.06}
               height={width * 0.025}
               rx={width * 0.003}
               fill={teamColor(selected.team)}
             />
             <text
-              x={selected.plotX + width * 0.045}
-              y={selected.plotY - width * 0.0525}
+              x={width * 0.045}
+              y={-width * 0.0525}
               fontSize={width * 0.017}
               fontWeight="bold"
               fill="#05070a"

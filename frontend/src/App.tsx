@@ -43,6 +43,14 @@ const DASHBOARD_DEFAULT_LAYOUT: WidgetLayoutItem[] = [
 const LAYOUT_KEY = "pitwall-dashboard-layout";
 const HIDDEN_KEY = "pitwall-hidden-widgets";
 
+// Practice and qualifying sessions want the timing view (fastest lap + sectors,
+// no gap-to-leader). Race ("R") and Sprint ("S") stay in race mode by default.
+function isTimingSession(sessionType: string | null | undefined): boolean {
+  if (!sessionType) return false;
+  const t = sessionType.toUpperCase();
+  return t.startsWith("FP") || t === "Q" || t === "SQ" || t.includes("PRACTICE") || t.includes("QUALI");
+}
+
 function trackStatusColorClass(status: SessionState["track_status"] | undefined): string {
   if (status === "green") return "pitwall-flag-green";
   if (status === "yellow" || status === "safety_car" || status === "virtual_safety_car") return "pitwall-flag-yellow";
@@ -75,6 +83,15 @@ export default function App() {
 
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "telemetry">("dashboard");
+
+  // Qualifying/timing view: auto-on for practice/quali sessions, off for race,
+  // and a manual header toggle overrides the auto default once the user clicks.
+  const [qualifyingView, setQualifyingView] = useState(false);
+  const [qualifyingTouched, setQualifyingTouched] = useState(false);
+  useEffect(() => {
+    if (qualifyingTouched) return;
+    setQualifyingView(isTimingSession(latest?.session_type));
+  }, [latest?.session_type, qualifyingTouched]);
 
   const [hiddenWidgets, setHiddenWidgets] = useState<string[]>(() => {
     try {
@@ -148,7 +165,7 @@ export default function App() {
     {
       id: "timing-tower",
       title: "Timing Tower",
-      node: <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} />,
+      node: <TimingTower state={latest} selectedDriver={selectedDriver} onSelectDriver={setSelectedDriver} qualifyingMode={qualifyingView} />,
     },
     {
       id: "circuit",
@@ -205,6 +222,17 @@ export default function App() {
             Telemetry
           </button>
         </nav>
+        <button
+          type="button"
+          className={qualifyingView ? "pitwall-tab pitwall-tab-active" : "pitwall-tab"}
+          onClick={() => {
+            setQualifyingTouched(true);
+            setQualifyingView((on) => !on);
+          }}
+          title="Timing view: fastest lap and sectors instead of gap to leader"
+        >
+          Qualifying View
+        </button>
         {activeTab === "dashboard" && (
           <div className="pitwall-widgets-menu">
             <button
