@@ -8,6 +8,7 @@ import {
   LapTimesChart,
   PositionChangesChart,
 } from "./LapCharts";
+import { SectorPerformanceTable, PaceAnalysisTable, OvertakesTable } from "./AnalysisTables";
 
 type SessionParams = { year: number; event: string; sessionType: string } | null;
 
@@ -22,15 +23,15 @@ type ChartProps = {
 const VIEWS: { name: string; chart?: ComponentType<ChartProps> }[] = [
   { name: "Position Changes", chart: PositionChangesChart },
   { name: "Lap Comparison" },
-  { name: "Sector Performance" },
+  { name: "Sector Performance", chart: SectorPerformanceTable },
   { name: "Relative Gap Trend", chart: RelativeGapTrendChart },
   { name: "Gap to Leader", chart: GapToLeaderChart },
   { name: "Gap vs Field Average", chart: GapVsFieldAverageChart },
   { name: "Weather Impact on Pace" },
   { name: "Weather History" },
-  { name: "Overtakes" },
+  { name: "Overtakes", chart: OvertakesTable },
   { name: "Lap Times", chart: LapTimesChart },
-  { name: "Pace Analysis" },
+  { name: "Pace Analysis", chart: PaceAnalysisTable },
 ];
 
 export function AnalysisTab({

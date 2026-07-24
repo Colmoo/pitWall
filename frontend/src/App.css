@@ -740,3 +740,11 @@ tr.pitwall-row-selectable {
 .pitwall-analysis-placeholder {
   color: var(--label);
 }
+
+.pitwall-analysis-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.pitwall-analysis-table-wrap table {
+  width: 100%;
+}
