@@ -9,6 +9,7 @@ import {
   PositionChangesChart,
 } from "./LapCharts";
 import { SectorPerformanceTable, PaceAnalysisTable, OvertakesTable } from "./AnalysisTables";
+import { WeatherHistoryChart, WeatherImpactChart } from "./WeatherCharts";
 
 type SessionParams = { year: number; event: string; sessionType: string } | null;
 
@@ -27,8 +28,8 @@ const VIEWS: { name: string; chart?: ComponentType<ChartProps> }[] = [
   { name: "Relative Gap Trend", chart: RelativeGapTrendChart },
   { name: "Gap to Leader", chart: GapToLeaderChart },
   { name: "Gap vs Field Average", chart: GapVsFieldAverageChart },
-  { name: "Weather Impact on Pace" },
-  { name: "Weather History" },
+  { name: "Weather Impact on Pace", chart: WeatherImpactChart },
+  { name: "Weather History", chart: WeatherHistoryChart },
   { name: "Overtakes", chart: OvertakesTable },
   { name: "Lap Times", chart: LapTimesChart },
   { name: "Pace Analysis", chart: PaceAnalysisTable },

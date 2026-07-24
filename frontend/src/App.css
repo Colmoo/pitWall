@@ -748,3 +748,17 @@ tr.pitwall-row-selectable {
 .pitwall-analysis-table-wrap table {
   width: 100%;
 }
+
+.pitwall-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--label);
+  font-size: 13px;
+}
+.pitwall-legend i {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  display: inline-block;
+}

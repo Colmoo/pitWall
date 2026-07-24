@@ -14,6 +14,7 @@ def build_lap_analysis(states: list[SessionState]) -> dict:
     meta: dict[str, dict] = {}
     laps_by_driver: dict[str, dict[int, dict]] = defaultdict(dict)
     sc_vsc_laps: set[int] = set()
+    weather_by_lap: dict[int, dict] = {}
     max_lap = 0
 
     for state in states:
@@ -21,6 +22,15 @@ def build_lap_analysis(states: list[SessionState]) -> dict:
         race_lap = max((d.lap_number or 0 for d in state.drivers), default=0)
         if state.track_status in (TrackStatus.SC, TrackStatus.VSC):
             sc_vsc_laps.add(race_lap)
+        if race_lap >= 1 and state.weather is not None:
+            weather_by_lap[race_lap] = {
+                "lap": race_lap,
+                "air_temp": state.weather.air_temp,
+                "track_temp": state.weather.track_temp,
+                "humidity": state.weather.humidity,
+                "wind_speed": state.weather.wind_speed,
+                "rainfall": state.weather.rainfall,
+            }
         for d in state.drivers:
             if d.lap_number is None:
                 continue
@@ -56,6 +66,7 @@ def build_lap_analysis(states: list[SessionState]) -> dict:
     return {
         "total_laps": max_lap,
         "sc_vsc_laps": _contiguous_ranges(sorted(sc_vsc_laps)),
+        "weather": [weather_by_lap[lap] for lap in sorted(weather_by_lap)],
         "drivers": drivers,
     }
 

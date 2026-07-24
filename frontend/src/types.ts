@@ -94,8 +94,18 @@ export interface AnalysisDriver {
   laps: AnalysisLap[];
 }
 
+export interface AnalysisWeather {
+  lap: number;
+  air_temp: number;
+  track_temp: number;
+  humidity: number;
+  wind_speed: number;
+  rainfall: boolean;
+}
+
 export interface LapAnalysis {
   total_laps: number;
   sc_vsc_laps: [number, number][];
+  weather: AnalysisWeather[];
   drivers: AnalysisDriver[];
 }

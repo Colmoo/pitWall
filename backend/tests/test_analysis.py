@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from app.analysis import build_lap_analysis
-from app.schema import DriverState, SessionState, Tire, TrackStatus
+from app.schema import DriverState, SessionState, Tire, TrackStatus, WeatherSnapshot
 
 
 def _driver(num, abbr, pos, lap, gap, compound="SOFT", last=90.0):
@@ -39,6 +39,18 @@ def test_build_lap_analysis_marks_pit_on_compound_change():
     ]
     ver = build_lap_analysis(states)["drivers"][0]
     assert [lap["pit"] for lap in ver["laps"]] == [False, False, True]
+
+
+def test_build_lap_analysis_collects_weather_per_lap():
+    ts = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    w1 = WeatherSnapshot(air_temp=22.0, track_temp=40.0, humidity=30.0, wind_speed=2.0, rainfall=False)
+    w2 = WeatherSnapshot(air_temp=23.0, track_temp=42.0, humidity=28.0, wind_speed=3.0, rainfall=True)
+    s1 = _state(ts, [_driver("1", "VER", 1, 1, None)]); s1.weather = w1
+    s2 = _state(ts, [_driver("1", "VER", 1, 2, None)]); s2.weather = w2
+    result = build_lap_analysis([s1, s2])
+    assert [w["lap"] for w in result["weather"]] == [1, 2]
+    assert result["weather"][1]["track_temp"] == 42.0
+    assert result["weather"][1]["rainfall"] is True
 
 
 def test_build_lap_analysis_collapses_sc_vsc_into_ranges():
