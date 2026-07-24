@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.ai_adapter import call_ollama, describe_state, summarize_changes
+from app.analysis import build_lap_analysis
 from app.broadcaster import Broadcaster
 from app.fastf1_adapter import (
     list_events_for_year,
@@ -211,6 +212,17 @@ async def track_layout(year: int, event: str, session_type: str):
     return load_track_layout(
         year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
     )
+
+
+@app.get("/session/analysis")
+async def session_analysis(year: int, event: str, session_type: str):
+    # Per-driver, per-lap dataset for the race-analysis charts (gap-to-leader,
+    # gap-vs-field, positions, lap/sector times, pace, overtakes). Reuses the
+    # replay pipeline's already-computed gaps; cached after first load.
+    states = await asyncio.to_thread(
+        load_session_states, year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
+    )
+    return build_lap_analysis(states)
 
 
 @app.get("/session/live/track-layout")

@@ -74,3 +74,28 @@ export interface AiNote {
   timestamp: string;
   text: string;
 }
+
+export interface AnalysisLap {
+  lap: number;
+  position: number;
+  gap_to_leader: number | null;
+  lap_time: number | null;
+  sector_1_time: number | null;
+  sector_2_time: number | null;
+  sector_3_time: number | null;
+  compound: string;
+  pit: boolean;
+}
+
+export interface AnalysisDriver {
+  driver_number: string;
+  abbreviation: string;
+  team: string;
+  laps: AnalysisLap[];
+}
+
+export interface LapAnalysis {
+  total_laps: number;
+  sc_vsc_laps: [number, number][];
+  drivers: AnalysisDriver[];
+}

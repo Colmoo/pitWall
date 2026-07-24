@@ -22,6 +22,8 @@ import { WidgetGrid } from "./panels/WidgetGrid";
 import type { WidgetLayoutItem } from "./panels/WidgetGrid";
 import { TelemetryTab } from "./panels/TelemetryTab";
 import { TeamRadioPanel } from "./panels/TeamRadioPanel";
+import { AnalysisTab } from "./panels/AnalysisTab";
+import { useLapAnalysis } from "./api/useLapAnalysis";
 
 // ponytail: fixed heuristic heights tuned by eye per panel's typical content density,
 // not a true content-driven autosize. Upgrade path: measure content and size dynamically.
@@ -82,7 +84,8 @@ export default function App() {
   const notes = useAiNotes(AI_NOTES_WS_URL);
 
   const [selectedDriver, setSelectedDriver] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"dashboard" | "telemetry">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "telemetry" | "analysis">("dashboard");
+  const analysis = useLapAnalysis(sessionParams);
 
   // Qualifying/timing view: auto-on for practice/quali sessions, off for race,
   // and a manual header toggle overrides the auto default once the user clicks.
@@ -221,6 +224,13 @@ export default function App() {
           >
             Telemetry
           </button>
+          <button
+            type="button"
+            className={activeTab === "analysis" ? "pitwall-tab pitwall-tab-active" : "pitwall-tab"}
+            onClick={() => setActiveTab("analysis")}
+          >
+            Analysis
+          </button>
         </nav>
         <button
           type="button"
@@ -282,6 +292,16 @@ export default function App() {
       {activeTab === "telemetry" && (
         <main className="pitwall-main">
           <TelemetryTab sessionParams={sessionParams} state={latest} history={history} />
+        </main>
+      )}
+      {activeTab === "analysis" && (
+        <main className="pitwall-main">
+          <AnalysisTab
+            sessionParams={sessionParams}
+            analysis={analysis}
+            selectedDriver={selectedDriver}
+            onSelectDriver={setSelectedDriver}
+          />
         </main>
       )}
       <footer className="pitwall-ticker">
