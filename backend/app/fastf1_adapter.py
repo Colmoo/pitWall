@@ -187,7 +187,7 @@ def attach_car_positions(
     states: list[SessionState],
     pos_data: dict[str, "pd.DataFrame"],
     session_start: datetime,
-    tick_seconds: float = 3.0,
+    tick_seconds: float = 5.0,
 ) -> list[SessionState]:
     sorted_positions = {number: df.sort_values("Time") for number, df in pos_data.items() if not df.empty}
     if not states or not sorted_positions:
@@ -209,6 +209,11 @@ def attach_car_positions(
             # of a deep copy of all 20 drivers' full data. Fresh driver objects
             # are needed because _attach_positions_at mutates x/y in place - the
             # originals (already emitted) must stay untouched.
+            # Ceiling: the whole expanded list is resident in RAM - a 2h race is
+            # ~1400 states x 20 driver copies at the 5s default (3s was ~40%
+            # heavier, for smoothness no one could see). Upgrade path: drop the
+            # pre-expansion and generate tick positions lazily as the replay
+            # loop emits each state.
             tick_drivers = [driver.model_copy() for driver in state.drivers]
             snapshot = state.model_copy(update={"drivers": tick_drivers, "timestamp": session_start + tick})
             _attach_positions_at(snapshot, sorted_positions, tick)
@@ -260,8 +265,30 @@ def race_control_messages_up_to(rcm: pd.DataFrame, timestamp: datetime) -> list[
 
 
 def attach_race_control_messages(states: list[SessionState], rcm: pd.DataFrame) -> None:
-    for state in states:
-        state.race_control_messages = race_control_messages_up_to(rcm, state.timestamp)
+    if rcm is None or rcm.empty:
+        for state in states:
+            state.race_control_messages = []
+        return
+    ordered = rcm.sort_values("Time")
+    times = [t.to_pydatetime() if hasattr(t, "to_pydatetime") else t for t in ordered["Time"]]
+    messages = [
+        RaceControlMessage(
+            timestamp=timestamp,
+            category=category,
+            message=message,
+            flag=None if pd.isna(flag) else flag,
+        )
+        for timestamp, category, message, flag in zip(times, ordered["Category"], ordered["Message"], ordered["Flag"])
+    ]
+    # ponytail: each message object is built once and every state gets a prefix
+    # SLICE of the same list, so a 2h race holds ~150 messages instead of
+    # ~360k copies. sorted() only guards against unordered input - states are
+    # already time-ordered in practice, so this stays O(states + messages).
+    cursor = 0
+    for state in sorted(states, key=lambda s: s.timestamp):
+        while cursor < len(times) and times[cursor] <= state.timestamp:
+            cursor += 1
+        state.race_control_messages = messages[:cursor]
 
 
 _session_cache: dict[tuple[int, str, str], "fastf1.core.Session"] = {}

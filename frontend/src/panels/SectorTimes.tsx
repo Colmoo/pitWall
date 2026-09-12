@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { SessionState, DriverState } from "../types";
 import { formatGap } from "../constants";
 
@@ -52,7 +53,7 @@ function SectorCell({
   );
 }
 
-export function SectorTimes({
+export const SectorTimes = memo(function SectorTimes({
   state,
   qualifyingMode = false,
 }: {
@@ -97,4 +98,4 @@ export function SectorTimes({
       </tbody>
     </table>
   );
-}
+});

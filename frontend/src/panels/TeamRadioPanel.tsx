@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { SessionState } from "../types";
 import { useRadioAutoplay } from "../api/useRadioAutoplay";
 
-export function TeamRadioPanel({
+export const TeamRadioPanel = memo(function TeamRadioPanel({
   state,
   selectedDriver = null,
 }: {
@@ -73,4 +73,4 @@ export function TeamRadioPanel({
       )}
     </div>
   );
-}
+});

@@ -452,6 +452,20 @@ def test_attach_race_control_messages_only_includes_messages_up_to_timestamp():
     assert states[-1].race_control_messages[1].flag == "YELLOW"
 
 
+def test_attach_race_control_messages_shares_message_objects_across_states():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    rcm = pd.DataFrame([
+        dict(Time=session_start + timedelta(seconds=30), Category="Other", Message="PIT EXIT OPEN", Flag=None),
+        dict(Time=session_start + timedelta(minutes=3), Category="Flag", Message="YELLOW FLAG", Flag="YELLOW"),
+    ])
+
+    attach_race_control_messages(states, rcm)
+
+    # Built once, shared by slice - fails if anyone reverts to rebuilding per state.
+    assert states[0].race_control_messages[0] is states[-1].race_control_messages[0]
+
+
 def test_load_driver_lap_telemetry_returns_traces(monkeypatch):
     car_data = pd.DataFrame({
         "Distance": [0.0, 10.0, 20.0],

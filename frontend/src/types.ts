@@ -68,6 +68,7 @@ export interface SessionState {
   weather: WeatherSnapshot | null;
   race_control_messages: RaceControlMessage[];
   team_radio: TeamRadioClip[];
+  snapshot?: boolean;
 }
 
 export interface AiNote {

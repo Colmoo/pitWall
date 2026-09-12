@@ -1,7 +1,9 @@
 import asyncio
+import json
 import logging
 import os
 from datetime import datetime, timezone
+from functools import lru_cache
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,6 +47,25 @@ _previous_state_for_ai: SessionState | None = None
 
 _current_task: asyncio.Task | None = None
 
+# Cumulative race-control/team-radio lists as last BROADCAST for the current
+# session; broadcast frames carry only the tail new since these.
+_sent_race_control: list = []
+_sent_team_radio: list = []
+# Set on (re)start: the first frame of a new session must reset the accumulators
+# of clients that stayed connected across the restart.
+_needs_prime: bool = False
+
+
+def _new_entries(previous: list, current: list) -> list | None:
+    # ponytail: O(n) prefix compare per tick on lists of at most a few hundred
+    # entries; swap for a monotonic cursor/id if it ever shows up hot.
+    # None means current is not an extension of what we sent (the live feed
+    # reordered or edited an entry), so it cannot be expressed as a delta and
+    # the caller re-primes instead.
+    if previous and (len(current) < len(previous) or current[:len(previous)] != previous):
+        return None
+    return current[len(previous):]
+
 
 def _log_task_exception(task: asyncio.Task) -> None:
     if task.cancelled():
@@ -55,9 +76,16 @@ def _log_task_exception(task: asyncio.Task) -> None:
 
 
 def _start_session_task(coro) -> None:
-    global _current_task
+    global _current_task, _sent_race_control, _sent_team_radio, _latest_state, _needs_prime
     if _current_task is not None and not _current_task.done():
         _current_task.cancel()
+    _sent_race_control = []
+    _sent_team_radio = []
+    _needs_prime = True
+    # The delta cursors restart here, so the next frame carries full lists. Drop
+    # the old session's state too, or a client connecting in the gap would be
+    # primed with it and then append those full lists on top.
+    _latest_state = None
     _current_task = asyncio.create_task(coro)
     _current_task.add_done_callback(_log_task_exception)
 
@@ -89,10 +117,32 @@ class ReplayRequest(BaseModel):
     speed: float = 1.0
 
 
+def _encode(state: SessionState) -> str:
+    # Same compact, non-escaped encoding Starlette's send_json used before frames
+    # were serialized once here.
+    return json.dumps(state.model_dump(mode="json"), separators=(",", ":"), ensure_ascii=False)
+
+
 async def _publish_state(state: SessionState) -> None:
-    global _latest_state
+    global _latest_state, _sent_race_control, _sent_team_radio, _needs_prime
     _latest_state = state
-    await broadcaster.publish(state)
+    new_race_control = _new_entries(_sent_race_control, state.race_control_messages)
+    new_team_radio = _new_entries(_sent_team_radio, state.team_radio)
+    _sent_race_control = state.race_control_messages
+    _sent_team_radio = state.team_radio
+    if _needs_prime or new_race_control is None or new_team_radio is None:
+        # Not expressible as a delta (reordered feed), or the first frame of a new
+        # session, so re-prime: clients reset both accumulators to these full lists
+        # instead of appending duplicates on top of the previous session's.
+        frame = state.model_copy(update={"snapshot": True})
+        _needs_prime = False
+    else:
+        frame = state.model_copy(update={
+            "race_control_messages": new_race_control,
+            "team_radio": new_team_radio,
+        })
+    # Serialized once here, sent verbatim to every subscriber.
+    await broadcaster.publish(_encode(frame))
 
 
 async def _run_ai_note_cycle() -> None:
@@ -214,15 +264,24 @@ async def track_layout(year: int, event: str, session_type: str):
     )
 
 
+# ponytail: maxsize=2 bounds memory to a couple of sessions and never expires;
+# restart the process (or move to a TTL cache) if a session's data can change
+# underneath it.
+@lru_cache(maxsize=2)
+def _cached_lap_analysis(year: int, event: str, session_type: str):
+    states = load_session_states(
+        year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
+    )
+    return build_lap_analysis(states)
+
+
 @app.get("/session/analysis")
 async def session_analysis(year: int, event: str, session_type: str):
     # Per-driver, per-lap dataset for the race-analysis charts (gap-to-leader,
     # gap-vs-field, positions, lap/sector times, pace, overtakes). Reuses the
-    # replay pipeline's already-computed gaps; cached after first load.
-    states = await asyncio.to_thread(
-        load_session_states, year=year, event=event, session_type=session_type, cache_dir=CACHE_DIR,
-    )
-    return build_lap_analysis(states)
+    # replay pipeline's already-computed gaps; expanding the per-tick states is
+    # the expensive part, so the built result is cached.
+    return await asyncio.to_thread(_cached_lap_analysis, year, event, session_type)
 
 
 @app.get("/session/live/track-layout")
@@ -244,9 +303,12 @@ async def session_socket(websocket: WebSocket):
     await websocket.accept()
     queue = broadcaster.subscribe()
     try:
+        if _latest_state is not None:
+            # Priming frame: broadcast frames only carry new messages, so a fresh
+            # client needs the full cumulative lists once up front.
+            await websocket.send_text(_encode(_latest_state.model_copy(update={"snapshot": True})))
         while True:
-            state = await queue.get()
-            await websocket.send_json(state.model_dump(mode="json"))
+            await websocket.send_text(await queue.get())
     except (WebSocketDisconnect, RuntimeError):
         # Starlette's WebSocket.send() only converts OSError to WebSocketDisconnect;
         # other close-related failures (e.g. sending after the connection already

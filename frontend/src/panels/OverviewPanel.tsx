@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { SessionState } from "../types";
 
 function statusColorClass(status: SessionState["track_status"] | undefined): string {
@@ -7,7 +8,7 @@ function statusColorClass(status: SessionState["track_status"] | undefined): str
   return "";
 }
 
-export function OverviewPanel({ state }: { state: SessionState | null }) {
+export const OverviewPanel = memo(function OverviewPanel({ state }: { state: SessionState | null }) {
   const leader = state && state.drivers.length > 0 ? state.drivers[0] : null;
 
   return (
@@ -28,4 +29,4 @@ export function OverviewPanel({ state }: { state: SessionState | null }) {
       </div>
     </>
   );
-}
+});

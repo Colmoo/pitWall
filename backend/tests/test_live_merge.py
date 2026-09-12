@@ -59,11 +59,14 @@ def test_merge_patch_index_keyed_dict_extends_list_with_padding():
     assert result["s"] == [{"v": 1}, None, {"v": 3}]
 
 
-def test_merge_patch_does_not_mutate_inputs():
+def test_merge_patch_merges_into_base_in_place():
+    # merge_patch is documented as in-place: the live tree is single-owner and
+    # copying it per patch was pure allocation.
     base = {"a": {"b": 1}}
     patch = {"a": {"c": 2}}
-    merge_patch(base, patch)
-    assert base == {"a": {"b": 1}}
+    result = merge_patch(base, patch)
+    assert result is base
+    assert base == {"a": {"b": 1, "c": 2}}
     assert patch == {"a": {"c": 2}}
 
 

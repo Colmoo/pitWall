@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SessionState } from "../types";
 import { teamColor } from "../constants";
 
@@ -103,13 +103,13 @@ function offsetPolyline(points: LayoutPoint[], distance: number): LayoutPoint[] 
 export function TrackMap({
   state,
   sessionParams,
-  history = [],
+  tracedPoints = [],
   selectedDriver = null,
   onSelectDriver,
 }: {
   state: SessionState | null;
   sessionParams: SessionParams;
-  history?: SessionState[];
+  tracedPoints?: LayoutPoint[];
   selectedDriver?: string | null;
   onSelectDriver?: (driverNumber: string) => void;
 }) {
@@ -124,11 +124,6 @@ export function TrackMap({
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
-  // ponytail: raw `history` is a bounded rolling window (see useSessionSocket),
-  // so accumulate the traced live outline append-only in a ref keyed on the
-  // last-processed state's identity. Only new states are scanned per render and
-  // the traced circuit survives after early positions roll off the window.
-  const tracedRef = useRef<{ last: SessionState | null; points: LayoutPoint[] }>({ last: null, points: [] });
 
   type TrackLayoutResponse = {
     points: LayoutPoint[];
@@ -186,27 +181,6 @@ export function TrackMap({
       cancelled = true;
     };
   }, [sessionParams]);
-
-  // Live mode has no FastF1 (year/event/session) identifier to fetch a layout
-  // with, so trace the circuit from the leader's live x/y positions instead -
-  // no separate request, no waiting on a FastF1 session load.
-  const tracedPoints: LayoutPoint[] = useMemo(() => {
-    if (sessionParams) return [];
-    const acc = tracedRef.current;
-    let start = 0;
-    if (acc.last !== null) {
-      const found = history.indexOf(acc.last);
-      // marker missing => history reset (or window jumped past it): rebuild.
-      if (found === -1) acc.points = [];
-      else start = found + 1;
-    }
-    for (let i = start; i < history.length; i++) {
-      const d = history[i].drivers.find((dr) => dr.position === 1) ?? history[i].drivers[0];
-      if (d != null && d.x != null && d.y != null) acc.points.push([d.x as number, d.y as number]);
-    }
-    if (history.length > 0) acc.last = history[history.length - 1];
-    return acc.points;
-  }, [history, sessionParams]);
 
   // Prefer a real fetched outline (replay, or the live past-year fallback);
   // fall back to points traced from live car positions if that's all we have.

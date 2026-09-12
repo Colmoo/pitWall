@@ -75,6 +75,8 @@ test("switches to the telemetry tab and back without losing dashboard state", as
   expect(screen.getByText(/overview/i)).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: /^telemetry$/i }));
+  // TelemetryTab is lazy-loaded, so wait for the chunk to resolve past the Suspense fallback
+  expect(await screen.findByText("Telemetry Comparison")).toBeInTheDocument();
   expect(screen.queryByText(/overview/i)).not.toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: /^dashboard$/i }));

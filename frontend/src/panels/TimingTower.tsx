@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import type { SessionState } from "../types";
 import { formatGap, teamColor, tireColor } from "../constants";
 
@@ -16,7 +16,7 @@ function bestSectorDriver(
   return best?.driverNumber ?? null;
 }
 
-export function TimingTower({
+export const TimingTower = memo(function TimingTower({
   state,
   selectedDriver,
   onSelectDriver,
@@ -119,4 +119,4 @@ export function TimingTower({
       </table>
     </>
   );
-}
+});

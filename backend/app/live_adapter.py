@@ -1,5 +1,6 @@
 import base64
 import json
+import time
 import zlib
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
@@ -371,13 +372,19 @@ def resolve_fastf1_session_identity(tree: dict) -> tuple[int, str, str] | None:
 
 
 class LiveAdapter:
-    def __init__(self, sse_url: str):
+    # ponytail: fixed-interval throttle - every patch still merges, only the
+    # pydantic rebuild is rate-limited. Switch to coalescing per changed branch
+    # if 4 Hz full rebuilds ever stop being cheap enough.
+    def __init__(self, sse_url: str, min_emit_interval: float = 0.25):
         self._sse_url = sse_url
+        self._min_emit_interval = min_emit_interval
         self._transport = None  # test seam: MockTransport in tests, real network otherwise
         self.last_tree: dict = {}
 
     async def stream(self) -> AsyncIterator[SessionState]:
         tree: dict = {}
+        last_emit = None
+        pending = False
         async with httpx.AsyncClient(transport=self._transport, timeout=None) as client:
             async with client.stream("GET", self._sse_url) as response:
                 buffer = ""
@@ -394,6 +401,25 @@ class LiveAdapter:
                             tree = payload if event_type == "initial" else merge_patch(tree, payload)
                             self.last_tree = tree
 
+                            now = time.monotonic()
+                            if last_emit is not None and now - last_emit < self._min_emit_interval:
+                                pending = True
+                                continue
+
                             state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
                             if state is not None:
+                                last_emit = now
+                                pending = False
                                 yield state
+                # The throttle defers, it does not drop: the stream can end inside
+                # a throttle window (chequered flag, dropped connection), so emit
+                # the coalesced tail rather than losing those patches entirely.
+                # ponytail: only covers the stream ENDING mid-window - a feed that
+                # goes quiet while still connected keeps its last patch pending
+                # until the next one arrives. Needs a read timeout to fix, which
+                # means not cancelling an in-flight httpx read; do that if a real
+                # feed ever stalls mid-session.
+                if pending:
+                    state = session_state_from_live_tree(tree, datetime.now(timezone.utc))
+                    if state is not None:
+                        yield state

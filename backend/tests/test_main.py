@@ -1,3 +1,4 @@
+import asyncio
 from fastapi.testclient import TestClient
 from app.main import app
 from app import main as app_module
@@ -278,3 +279,87 @@ def test_meta_sessions_endpoint(monkeypatch):
     resp = client.get("/meta/sessions", params={"year": 2023, "event": "Bahrain Grand Prix"})
     assert resp.status_code == 200
     assert resp.json() == {"sessions": ["Practice 1", "Qualifying", "Race"]}
+
+
+def _rc(text):
+    from app.schema import RaceControlMessage
+    return RaceControlMessage(
+        timestamp=datetime(2026, 7, 9, 13, 5, tzinfo=timezone.utc),
+        category="Flag", message=text, flag="YELLOW",
+    )
+
+
+def _state(messages):
+    return SessionState(
+        timestamp=datetime.now(timezone.utc), track_status=TrackStatus.GREEN,
+        drivers=[], race_control_messages=messages,
+    )
+
+
+def test_broadcast_frames_carry_only_new_race_control_messages():
+    app_module._sent_race_control = []
+    app_module._sent_team_radio = []
+    app_module._needs_prime = False  # mid-session: clients already hold the cursors
+    with client.websocket_connect("/ws/session") as ws:
+        if app_module._latest_state is not None:
+            ws.receive_json()  # priming frame
+        client.portal.call(app_module._publish_state, _state([_rc("YELLOW S1")]))
+        client.portal.call(app_module._publish_state, _state([_rc("YELLOW S1"), _rc("YELLOW S2")]))
+        first = ws.receive_json()
+        second = ws.receive_json()
+    assert [m["message"] for m in first["race_control_messages"]] == ["YELLOW S1"]
+    assert [m["message"] for m in second["race_control_messages"]] == ["YELLOW S2"]
+    assert not first["snapshot"]
+
+
+def test_reordered_message_list_is_reprimed_instead_of_sent_as_a_delta():
+    # The live feed can insert a message ahead of one already sent; that is not an
+    # extension of what clients hold, so it must arrive as a full snapshot frame.
+    app_module._sent_race_control = []
+    app_module._sent_team_radio = []
+    app_module._needs_prime = False  # mid-session: clients already hold the cursors
+    with client.websocket_connect("/ws/session") as ws:
+        if app_module._latest_state is not None:
+            ws.receive_json()  # priming frame
+        client.portal.call(app_module._publish_state, _state([_rc("YELLOW S1")]))
+        client.portal.call(app_module._publish_state, _state([_rc("YELLOW S0"), _rc("YELLOW S1")]))
+        ws.receive_json()
+        second = ws.receive_json()
+    assert second["snapshot"] is True
+    assert [m["message"] for m in second["race_control_messages"]] == ["YELLOW S0", "YELLOW S1"]
+
+
+def test_first_frame_of_a_new_session_is_a_snapshot_for_already_connected_clients():
+    # A restart resets the server's delta cursors; clients that stayed connected
+    # must be told to reset theirs too, or they append the new session's messages
+    # onto the previous session's.
+    app_module._sent_race_control = []
+    app_module._sent_team_radio = []
+    app_module._needs_prime = False  # mid-session: clients already hold the cursors
+    with client.websocket_connect("/ws/session") as ws:
+        if app_module._latest_state is not None:
+            ws.receive_json()  # priming frame
+
+        async def _restart():
+            app_module._start_session_task(asyncio.sleep(0))
+
+        client.portal.call(_restart)
+        client.portal.call(app_module._publish_state, _state([_rc("NEW SESSION S1")]))
+        client.portal.call(app_module._publish_state, _state([_rc("NEW SESSION S1"), _rc("S2")]))
+        first = ws.receive_json()
+        second = ws.receive_json()
+    assert first["snapshot"] is True
+    assert [m["message"] for m in first["race_control_messages"]] == ["NEW SESSION S1"]
+    assert not second["snapshot"]  # and back to deltas afterwards
+    assert [m["message"] for m in second["race_control_messages"]] == ["S2"]
+
+
+def test_new_client_receives_priming_frame_with_full_message_list():
+    app_module._sent_race_control = []
+    app_module._sent_team_radio = []
+    app_module._needs_prime = False  # mid-session: clients already hold the cursors
+    client.portal.call(app_module._publish_state, _state([_rc("YELLOW S1"), _rc("YELLOW S2")]))
+    with client.websocket_connect("/ws/session") as ws:
+        priming = ws.receive_json()
+    assert priming["snapshot"] is True
+    assert [m["message"] for m in priming["race_control_messages"]] == ["YELLOW S1", "YELLOW S2"]

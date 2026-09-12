@@ -43,3 +43,34 @@ test("builds traces from consecutive session states for the selected driver", ()
     rpm: [11000, 11500],
   });
 });
+
+test("keeps only the matching lap when a lap number is given", () => {
+  const history = [
+    state([driver({ speed: 200, lap_number: 4 })]),
+    state([driver({ speed: 250, lap_number: 5 })]),
+    state([driver({ speed: 260, lap_number: 5 })]),
+  ];
+  const { result } = renderHook(() => useLiveDriverTelemetry(history, "1", 5));
+  expect(result.current?.speed).toEqual([250, 260]);
+});
+
+test("skips states where the driver has no speed, preserving order", () => {
+  const history = [
+    state([driver({ speed: 200 })]),
+    state([driver({ speed: null })]),
+    state([driver({ speed: 210 })]),
+    state([]),
+    state([driver({ speed: 220 })]),
+  ];
+  const { result } = renderHook(() => useLiveDriverTelemetry(history, "1", null));
+  expect(result.current?.speed).toEqual([200, 210, 220]);
+  expect(result.current?.distance).toEqual([0, 1, 2]);
+});
+
+test("keeps exactly the 300 most recent samples for a long history", () => {
+  const history = Array.from({ length: 500 }, (_, i) => state([driver({ speed: i })]));
+  const { result } = renderHook(() => useLiveDriverTelemetry(history, "1", null));
+  expect(result.current?.speed).toHaveLength(300);
+  expect(result.current?.speed[0]).toBe(200);
+  expect(result.current?.speed[299]).toBe(499);
+});

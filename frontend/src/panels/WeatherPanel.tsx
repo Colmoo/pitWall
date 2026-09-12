@@ -1,6 +1,7 @@
+import { memo } from "react";
 import type { SessionState } from "../types";
 
-export function WeatherPanel({ state }: { state: SessionState | null }) {
+export const WeatherPanel = memo(function WeatherPanel({ state }: { state: SessionState | null }) {
   const weather = state?.weather ?? null;
 
   if (!weather) {
@@ -33,4 +34,4 @@ export function WeatherPanel({ state }: { state: SessionState | null }) {
       </div>
     </div>
   );
-}
+});

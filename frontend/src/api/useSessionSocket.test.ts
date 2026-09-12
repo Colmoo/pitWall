@@ -67,6 +67,26 @@ test("caps history to a bounded rolling window, dropping the oldest states", () 
   expect(result.current[0].timestamp).toBe(`t${overflow - HISTORY_CAP}`);
 });
 
+test("flushes without a frame when the backlog would evict the whole window", () => {
+  // @ts-expect-error test double
+  global.WebSocket = FakeWebSocket;
+  const raf = global.requestAnimationFrame;
+  // backgrounded tab: requestAnimationFrame is scheduled but never fires.
+  global.requestAnimationFrame = (() => 0) as typeof requestAnimationFrame;
+  const { result } = renderHook(() => useSessionSocket("ws://test/ws/session"));
+  const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+
+  act(() => {
+    for (let i = 0; i < HISTORY_CAP; i++) {
+      socket.onmessage?.({ data: JSON.stringify(sampleState(`t${i}`)) });
+    }
+  });
+  global.requestAnimationFrame = raf;
+
+  // states landed in history rather than piling up unflushed in the buffer.
+  expect(result.current.length).toBe(HISTORY_CAP);
+});
+
 test("resets history when resetKey changes, even if url stays the same", () => {
   // @ts-expect-error test double
   global.WebSocket = FakeWebSocket;
@@ -91,4 +111,64 @@ test("resets history when resetKey changes, even if url stays the same", () => {
   });
   expect(result.current).toHaveLength(1);
   expect(result.current[0].timestamp).toBe("t2");
+});
+
+function rcState(timestamp: string, messages: string[], snapshot?: boolean) {
+  return {
+    ...sampleState(timestamp),
+    race_control_messages: messages.map((message) => ({ timestamp, message })),
+    team_radio: [],
+    snapshot,
+  };
+}
+
+test("accumulates delta frames so the newest state carries the full cumulative list", () => {
+  // @ts-expect-error test double
+  global.WebSocket = FakeWebSocket;
+  const { result } = renderHook(() => useSessionSocket("ws://test/ws/session"));
+  const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+
+  act(() => {
+    socket.onmessage?.({ data: JSON.stringify(rcState("t1", ["yellow"])) });
+  });
+  act(() => {
+    socket.onmessage?.({ data: JSON.stringify(rcState("t2", ["green"])) });
+  });
+
+  const latest = result.current[result.current.length - 1];
+  expect(latest.race_control_messages.map((m) => m.message)).toEqual(["yellow", "green"]);
+});
+
+test("a snapshot frame resets the accumulator instead of appending", () => {
+  // @ts-expect-error test double
+  global.WebSocket = FakeWebSocket;
+  const { result } = renderHook(() => useSessionSocket("ws://test/ws/session"));
+  const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+
+  act(() => {
+    socket.onmessage?.({ data: JSON.stringify(rcState("t1", ["stale"])) });
+  });
+  act(() => {
+    socket.onmessage?.({ data: JSON.stringify(rcState("t2", ["a", "b"], true)) });
+  });
+
+  const latest = result.current[result.current.length - 1];
+  expect(latest.race_control_messages.map((m) => m.message)).toEqual(["a", "b"]);
+});
+
+test("a frame with no new messages reuses the same array reference", () => {
+  // @ts-expect-error test double
+  global.WebSocket = FakeWebSocket;
+  const { result } = renderHook(() => useSessionSocket("ws://test/ws/session"));
+  const socket = FakeWebSocket.instances[FakeWebSocket.instances.length - 1];
+
+  act(() => {
+    socket.onmessage?.({ data: JSON.stringify(rcState("t1", ["yellow"])) });
+  });
+  act(() => {
+    socket.onmessage?.({ data: JSON.stringify(rcState("t2", [])) });
+  });
+
+  expect(result.current[1].race_control_messages).toBe(result.current[0].race_control_messages);
+  expect(result.current[1].team_radio).toBe(result.current[0].team_radio);
 });

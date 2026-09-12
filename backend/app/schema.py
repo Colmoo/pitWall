@@ -94,3 +94,7 @@ class SessionState(BaseModel):
     weather: WeatherSnapshot | None = None
     race_control_messages: list[RaceControlMessage] = []
     team_radio: list[TeamRadioClip] = []
+    # True only on the priming frame a client gets when it connects: that frame
+    # carries the FULL cumulative race_control_messages/team_radio, while every
+    # broadcast frame carries only the entries new since the previous one.
+    snapshot: bool = False

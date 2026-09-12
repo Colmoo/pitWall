@@ -17,7 +17,7 @@ test("fetches and renders the track outline for the given session params", async
 
 test("shows a loading placeholder in live mode until an outline is available", () => {
   global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ points: [] }) });
-  render(<TrackMap state={null} sessionParams={null} history={[]} />);
+  render(<TrackMap state={null} sessionParams={null} tracedPoints={[]} />);
   expect(screen.getByText(/loading track layout/i)).toBeInTheDocument();
 });
 
@@ -40,8 +40,9 @@ test("traces the track outline from leader positions in live mode without waitin
     team_radio: [],
   });
   const history = [makeState(0, 0), makeState(10, 0), makeState(10, 10)];
+  const traced: [number, number][] = [[0, 0], [10, 0], [10, 10]];
 
-  render(<TrackMap state={history[history.length - 1]} sessionParams={null} history={history} />);
+  render(<TrackMap state={history[history.length - 1]} sessionParams={null} tracedPoints={traced} />);
 
   expect(await screen.findByTestId("track-outline")).toBeInTheDocument();
   // the outline itself is traced from live positions, with no wait on the

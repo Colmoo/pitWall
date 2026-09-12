@@ -347,7 +347,7 @@ async def test_live_adapter_stream_yields_states_from_sse_events():
         return httpx.Response(200, text=sse_body)
 
     transport = httpx.MockTransport(handler)
-    adapter = LiveAdapter("http://fake/api/realtime")
+    adapter = LiveAdapter("http://fake/api/realtime", min_emit_interval=0.0)
     adapter._transport = transport  # test seam, see Step 3
 
     states = [state async for state in adapter.stream()]
@@ -394,10 +394,39 @@ async def test_live_adapter_tracks_last_tree_as_it_streams(monkeypatch):
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, text=sse_body)
 
-    adapter = LiveAdapter("http://fake/api/realtime")
+    adapter = LiveAdapter("http://fake/api/realtime", min_emit_interval=0.0)
     adapter._transport = httpx.MockTransport(handler)
 
     states = [state async for state in adapter.stream()]
 
     assert len(states) == 1
     assert adapter.last_tree["SessionInfo"]["Path"] == "2026/2026-07-09_Silverstone/2026-07-09_Race/"
+
+
+@pytest.mark.asyncio
+async def test_live_adapter_coalesces_patches_faster_than_min_emit_interval():
+    sse_body = (
+        'event: initial\n'
+        'data: {"DriverList": {"1": {"Tla": "VER", "TeamName": "Red Bull"}}, '
+        '"TimingData": {"Lines": {"1": {"Position": "1", "LastLapTime": {"Value": "1:30.000"}}}}, '
+        '"TrackStatus": {"Status": "1"}}\n\n'
+        + "".join(
+            'event: update\n'
+            f'data: {{"TimingData": {{"Lines": {{"1": {{"LastLapTime": {{"Value": "1:29.{i:03d}"}}}}}}}}}}\n\n'
+            for i in range(5)
+        )
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=sse_body)
+
+    adapter = LiveAdapter("http://fake/api/realtime", min_emit_interval=60.0)
+    adapter._transport = httpx.MockTransport(handler)
+
+    states = [state async for state in adapter.stream()]
+
+    # the first, plus the 5 updates coalesced into one trailing flush when the
+    # stream ends inside the throttle window - throttling defers, never drops.
+    assert len(states) == 2
+    assert states[1].drivers[0].last_lap_time == 89.004
+    assert adapter.last_tree["TimingData"]["Lines"]["1"]["LastLapTime"]["Value"] == "1:29.004"

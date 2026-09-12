@@ -4,6 +4,8 @@ import type { Traces } from "./useDriverLapTelemetry";
 
 // ponytail: cap to the most recent samples so the trace stays readable and
 // cheap to redraw over a long live session; raise if a longer window is needed.
+// Scanning backwards keeps the cost O(MAX_SAMPLES) rather than O(history);
+// switch to an append-only ref if even that shows up in a profile.
 const MAX_SAMPLES = 300;
 
 export function useLiveDriverTelemetry(
@@ -13,14 +15,15 @@ export function useLiveDriverTelemetry(
 ): Traces | null {
   return useMemo(() => {
     if (!driver) return null;
-    const samples = history
-      .map((state) => state.drivers.find((d) => d.driver_number === driver))
-      .filter(
-        (d): d is NonNullable<typeof d> =>
-          d != null && d.speed != null && (lapNumber == null || d.lap_number === lapNumber),
-      )
-      .slice(-MAX_SAMPLES);
+    const samples: SessionState["drivers"] = [];
+    for (let i = history.length - 1; i >= 0 && samples.length < MAX_SAMPLES; i--) {
+      const d = history[i].drivers.find((x) => x.driver_number === driver);
+      if (d != null && d.speed != null && (lapNumber == null || d.lap_number === lapNumber)) {
+        samples.push(d);
+      }
+    }
     if (samples.length === 0) return null;
+    samples.reverse();
     return {
       distance: samples.map((_, i) => i),
       speed: samples.map((d) => d.speed ?? 0),

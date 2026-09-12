@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import "./App.css";
 import type { SessionState } from "./types";
@@ -20,10 +20,14 @@ import { WeatherPanel } from "./panels/WeatherPanel";
 import { RaceControlTicker } from "./panels/RaceControlTicker";
 import { WidgetGrid } from "./panels/WidgetGrid";
 import type { WidgetLayoutItem } from "./panels/WidgetGrid";
-import { TelemetryTab } from "./panels/TelemetryTab";
 import { TeamRadioPanel } from "./panels/TeamRadioPanel";
-import { AnalysisTab } from "./panels/AnalysisTab";
 import { useLapAnalysis } from "./api/useLapAnalysis";
+import { useSessionAccumulator } from "./api/useSessionAccumulator";
+
+// Tab-level code splitting: the app opens on the dashboard, so the telemetry and
+// analysis chart modules ship as separate chunks fetched on first tab click.
+const TelemetryTab = lazy(() => import("./panels/TelemetryTab").then((m) => ({ default: m.TelemetryTab })));
+const AnalysisTab = lazy(() => import("./panels/AnalysisTab").then((m) => ({ default: m.AnalysisTab })));
 
 // ponytail: fixed heuristic heights tuned by eye per panel's typical content density,
 // not a true content-driven autosize. Upgrade path: measure content and size dynamically.
@@ -89,6 +93,45 @@ export default function App() {
 
   // Qualifying/timing view: auto-on for practice/quali sessions, off for race,
   // and a manual header toggle overrides the auto default once the user clicks.
+  // Whole-session data the rolling history window can't hold on its own. Owned
+  // here rather than in the panels so it survives the dashboard unmounting on a
+  // tab switch - see useSessionAccumulator.
+  const gapPoints = useSessionAccumulator<number[]>(
+    history,
+    () => [],
+    (acc, s) => {
+      const gap = s.drivers.find((d) => d.driver_number === selectedDriver)?.gap_to_leader ?? null;
+      if (gap !== null) acc.push(gap);
+    },
+    selectedDriver,
+  );
+  const tireStints = useSessionAccumulator(
+    history,
+    () => ({ byDriver: new Map<string, Map<number, string>>(), maxLap: 0 }),
+    (acc, s) => {
+      for (const d of s.drivers) {
+        if (d.lap_number === null) continue;
+        let laps = acc.byDriver.get(d.driver_number);
+        if (!laps) {
+          laps = new Map();
+          acc.byDriver.set(d.driver_number, laps);
+        }
+        laps.set(d.lap_number, d.tire.compound);
+        if (d.lap_number > acc.maxLap) acc.maxLap = d.lap_number;
+      }
+    },
+  );
+  // Live mode has no FastF1 identifier to fetch a layout with, so the circuit is
+  // traced from the leader's live x/y instead; replay always fetches a real one.
+  const tracedPoints = useSessionAccumulator<[number, number][]>(
+    history,
+    () => [],
+    (acc, s) => {
+      const d = s.drivers.find((dr) => dr.position === 1) ?? s.drivers[0];
+      if (d != null && d.x != null && d.y != null) acc.push([d.x, d.y]);
+    },
+  );
+
   const [qualifyingView, setQualifyingView] = useState(false);
   const [qualifyingTouched, setQualifyingTouched] = useState(false);
   useEffect(() => {
@@ -178,15 +221,15 @@ export default function App() {
         <TrackMap
           state={latest}
           sessionParams={sessionParams}
-          history={history}
+          tracedPoints={sessionParams ? [] : tracedPoints}
           selectedDriver={selectedDriver}
           onSelectDriver={setSelectedDriver}
         />
       ),
     },
     { id: "sector-times", title: "Sector Times", node: <SectorTimes state={latest} qualifyingMode={qualifyingView} /> },
-    { id: "gap-trend", title: "Gap Trend (to Leader)", node: <GapTrendChart history={history} selectedDriver={selectedDriver} /> },
-    { id: "tire-strategy", title: "Tire Strategy", node: <TireStrategy history={history} /> },
+    { id: "gap-trend", title: "Gap Trend (to Leader)", node: <GapTrendChart points={gapPoints} selectedDriver={selectedDriver} /> },
+    { id: "tire-strategy", title: "Tire Strategy", node: <TireStrategy state={latest} byDriver={tireStints.byDriver} maxLap={tireStints.maxLap} /> },
     { id: "selected-driver", title: "Selected Driver", node: <SelectedDriverCard state={latest} selectedDriver={selectedDriver} /> },
     {
       id: "telemetry",
@@ -291,19 +334,23 @@ export default function App() {
       )}
       {activeTab === "telemetry" && (
         <main className="pitwall-main">
-          <TelemetryTab sessionParams={sessionParams} state={latest} history={history} />
+          <Suspense fallback={<p>Loading telemetry…</p>}>
+            <TelemetryTab sessionParams={sessionParams} state={latest} history={history} />
+          </Suspense>
         </main>
       )}
       {activeTab === "analysis" && (
         <main className="pitwall-main">
-          <AnalysisTab
-            sessionParams={sessionParams}
-            analysis={analysis}
-            state={latest}
-            history={history}
-            selectedDriver={selectedDriver}
-            onSelectDriver={setSelectedDriver}
-          />
+          <Suspense fallback={<p>Loading analysis…</p>}>
+            <AnalysisTab
+              sessionParams={sessionParams}
+              analysis={analysis}
+              state={latest}
+              history={history}
+              selectedDriver={selectedDriver}
+              onSelectDriver={setSelectedDriver}
+            />
+          </Suspense>
         </main>
       )}
       <footer className="pitwall-ticker">
