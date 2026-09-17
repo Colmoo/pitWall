@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 import fastf1
@@ -33,14 +34,26 @@ def _synthesize_positions(laps: pd.DataFrame) -> pd.Series:
     return positions
 
 
+def _gap_seconds(own: "pd.Timedelta", reference: "pd.Timedelta | None") -> float | None:
+    return None if reference is None else (own - reference).total_seconds()
+
+
 def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> list[SessionState]:
     states: list[SessionState] = []
     best_lap_by_driver: dict[str, float] = {}
+    # running best per sector, so the qualifying/timing view has data in replay
+    # too (live mode gets these from the feed's TimingStats instead).
+    best_sectors_by_driver: dict[str, list[float | None]] = {}
 
     # running: driver_number -> (latest DriverState, its row Time). Rebuilt into
     # a fresh snapshot on every lap-completion event so state doesn't drift once
     # emitted - see model_copy() below.
     running: dict[str, tuple[DriverState, "pd.Timedelta"]] = {}
+    # Line-crossing time per driver per lap, so a gap is always measured at the
+    # SAME lap (like the timing screen): subtracting the leader's latest crossing
+    # from a driver still on the previous lap gave negative gaps.
+    crossings: dict[str, dict[int, "pd.Timedelta"]] = {}
+    first_at_lap: dict[int, "pd.Timedelta"] = {}
 
     # Sort by Time (session-relative cumulative clock), not LapNumber - LapNumber
     # is a per-driver counter and bundling rows that share a count across drivers
@@ -59,6 +72,12 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
             best_so_far = last_lap_seconds
         best_lap_by_driver[number] = best_so_far
 
+        sectors = [_sector_seconds(row[c]) for c in ("Sector1Time", "Sector2Time", "Sector3Time")]
+        best_sectors = best_sectors_by_driver.setdefault(number, [None, None, None])
+        for i, t in enumerate(sectors):
+            if t is not None and (best_sectors[i] is None or t < best_sectors[i]):
+                best_sectors[i] = t
+
         age_laps = 0 if pd.isna(row["TyreLife"]) else int(row["TyreLife"])
         flying_lap = pd.isna(row["PitOutTime"]) and pd.isna(row["PitInTime"])
 
@@ -73,12 +92,17 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
             best_lap_time=best_so_far,
             tire=Tire(compound=row["Compound"], age_laps=age_laps),
             lap_number=int(row["LapNumber"]),
-            sector_1_time=_sector_seconds(row["Sector1Time"]),
-            sector_2_time=_sector_seconds(row["Sector2Time"]),
-            sector_3_time=_sector_seconds(row["Sector3Time"]),
+            sector_1_time=sectors[0],
+            sector_2_time=sectors[1],
+            sector_3_time=sectors[2],
+            best_sector_1_time=best_sectors[0],
+            best_sector_2_time=best_sectors[1],
+            best_sector_3_time=best_sectors[2],
             flying_lap=bool(flying_lap),
         )
         running[number] = (driver_state, row["Time"])
+        crossings.setdefault(number, {})[driver_state.lap_number] = row["Time"]
+        first_at_lap.setdefault(driver_state.lap_number, row["Time"])
 
         # entries pairs a *copy* of each currently-known driver's state with its
         # raw cumulative session Time, so gaps can be computed for this snapshot
@@ -87,13 +111,18 @@ def session_states_from_laps(laps: pd.DataFrame, session_start: datetime) -> lis
             (state.model_copy(), row_time) for state, row_time in running.values()
         ]
         entries.sort(key=lambda pair: pair[0].position)
-        leader_time = entries[0][1]
-        previous_time = None
+        ahead: DriverState | None = None
         for entry_state, row_time in entries:
-            is_leader = entry_state is entries[0][0]
-            entry_state.gap_to_leader = None if is_leader else (row_time - leader_time).total_seconds()
-            entry_state.gap_to_ahead = None if previous_time is None else (row_time - previous_time).total_seconds()
-            previous_time = row_time
+            lap = entry_state.lap_number
+            if ahead is None:
+                entry_state.gap_to_leader = None
+                entry_state.gap_to_ahead = None
+            else:
+                entry_state.gap_to_leader = _gap_seconds(row_time, first_at_lap.get(lap))
+                # None if the car ahead hasn't posted this lap (positions can be
+                # synthesized from best laps in FP/Q, so it isn't guaranteed).
+                entry_state.gap_to_ahead = _gap_seconds(row_time, crossings.get(ahead.driver_number, {}).get(lap))
+            ahead = entry_state
 
         states.append(
             SessionState(
@@ -291,13 +320,20 @@ def attach_race_control_messages(states: list[SessionState], rcm: pd.DataFrame) 
         state.race_control_messages = messages[:cursor]
 
 
+def _enable_cache(cache_dir: str) -> None:
+    # fastf1 refuses a missing directory instead of creating it; a fresh local
+    # run (no docker volume) 500'd on every /meta and replay call until then.
+    os.makedirs(cache_dir, exist_ok=True)
+    fastf1.Cache.enable_cache(cache_dir)
+
+
 _session_cache: dict[tuple[int, str, str], "fastf1.core.Session"] = {}
 
 
 def get_or_load_session(year: int, event: str, session_type: str, cache_dir: str) -> "fastf1.core.Session":
     key = (year, event, session_type)
     if key not in _session_cache:
-        fastf1.Cache.enable_cache(cache_dir)
+        _enable_cache(cache_dir)
         session = fastf1.get_session(year, event, session_type)
         session.load()
         _session_cache[key] = session
@@ -416,7 +452,7 @@ _schedule_cache: dict[int, "pd.DataFrame"] = {}
 
 def _get_schedule(year: int, cache_dir: str) -> "pd.DataFrame":
     if year not in _schedule_cache:
-        fastf1.Cache.enable_cache(cache_dir)
+        _enable_cache(cache_dir)
         _schedule_cache[year] = fastf1.get_event_schedule(year, include_testing=False)
     return _schedule_cache[year]
 
@@ -461,10 +497,12 @@ def load_driver_lap_telemetry(
 
 def load_session_states(year: int, event: str, session_type: str, cache_dir: str) -> list[SessionState]:
     session = get_or_load_session(year, event, session_type, cache_dir)
-    # ponytail: session.session_start_time is a Timedelta (session-relative), not
-    # an absolute datetime like session.date - use session.date as the anchor for
-    # lap "Time" deltas, which is accurate enough for display purposes.
-    session_start = session.date.to_pydatetime()
+    # Lap/weather/track-status "Time" deltas are measured from the timing feed's
+    # origin (session.t0_date), NOT the scheduled start (session.date) - the two
+    # differ by ~1h. Anchoring on session.date put every state an hour ahead of
+    # race_control_messages' absolute timestamps, so lap 2 already carried the
+    # whole race's messages. t0_date is None only when there's no timing data.
+    session_start = (session.t0_date if session.t0_date is not None else session.date).to_pydatetime()
     laps = session.laps
     if laps["Position"].isna().any():
         # Real races can leave Position NaN for just the opening lap(s) while

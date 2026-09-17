@@ -38,12 +38,12 @@ const DASHBOARD_DEFAULT_LAYOUT: WidgetLayoutItem[] = [
   { i: "sector-times", x: 0, y: 16, w: 9, h: 8 },
   { i: "gap-trend", x: 0, y: 24, w: 9, h: 8 },
   { i: "tire-strategy", x: 0, y: 32, w: 9, h: 8 },
-  { i: "selected-driver", x: 9, y: 14, w: 3, h: 8 },
-  { i: "telemetry", x: 9, y: 22, w: 3, h: 10 },
-  { i: "weather", x: 9, y: 32, w: 3, h: 5 },
-  { i: "team-radio", x: 9, y: 37, w: 3, h: 5 },
-  { i: "race-engineer-notes", x: 9, y: 42, w: 3, h: 6 },
-  { i: "ai-chat", x: 9, y: 48, w: 3, h: 8 },
+  { i: "selected-driver", x: 9, y: 14, w: 3, h: 10 },
+  { i: "telemetry", x: 9, y: 24, w: 3, h: 10 },
+  { i: "weather", x: 9, y: 34, w: 3, h: 5 },
+  { i: "team-radio", x: 9, y: 39, w: 3, h: 5 },
+  { i: "race-engineer-notes", x: 9, y: 44, w: 3, h: 6 },
+  { i: "ai-chat", x: 9, y: 50, w: 3, h: 8 },
 ];
 
 const LAYOUT_KEY = "pitwall-dashboard-layout";
@@ -335,7 +335,7 @@ export default function App() {
       {activeTab === "telemetry" && (
         <main className="pitwall-main">
           <Suspense fallback={<p>Loading telemetry…</p>}>
-            <TelemetryTab sessionParams={sessionParams} state={latest} history={history} />
+            <TelemetryTab sessionParams={sessionParams} state={latest} history={history} selectedDriver={selectedDriver} />
           </Suspense>
         </main>
       )}

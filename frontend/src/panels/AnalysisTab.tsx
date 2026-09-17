@@ -74,7 +74,7 @@ export function AnalysisTab({
           <p>Race analysis is available in replay mode. Start a replay from the landing page.</p>
         ) : viewName === "Lap Comparison" ? (
           // Reuse the full multi-driver, distance-aligned telemetry overlay.
-          <TelemetryTab sessionParams={sessionParams} state={state} history={history} />
+          <TelemetryTab sessionParams={sessionParams} state={state} history={history} selectedDriver={selectedDriver} />
         ) : Chart ? (
           <Chart analysis={analysis} selectedDriver={selectedDriver} onSelectDriver={onSelectDriver} />
         ) : (

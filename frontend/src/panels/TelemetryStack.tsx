@@ -11,7 +11,7 @@ function Trace({ testId, values, max, color }: { testId: string; values: number[
     .map((v, i) => `${(i * stepX).toFixed(2)},${(height - (v / max) * height).toFixed(2)}`)
     .join(" ");
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: 34 }}>
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ width: "100%", height: 34 }}>
       <polyline data-testid={testId} points={points} fill="none" stroke={color} strokeWidth={0.6} vectorEffect="non-scaling-stroke" />
     </svg>
   );

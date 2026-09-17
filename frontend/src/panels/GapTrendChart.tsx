@@ -23,7 +23,7 @@ export function GapTrendChart({
     .join(" ");
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: 80 }}>
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ width: "100%", height: 80 }}>
       <polyline
         data-testid="gap-trend-line"
         points={coords}

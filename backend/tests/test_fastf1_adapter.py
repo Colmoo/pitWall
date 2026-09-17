@@ -62,6 +62,17 @@ def test_session_states_from_laps_computes_running_best_lap():
     assert ver_lap2.best_lap_time == 90.0  # improved
 
 
+def test_session_states_from_laps_computes_running_best_sectors():
+    laps, session_start = _laps_df()
+    states = session_states_from_laps(laps, session_start)
+    ver_lap2 = next(d for d in states[2].drivers if d.abbreviation == "VER")
+    assert (ver_lap2.best_sector_1_time, ver_lap2.best_sector_2_time, ver_lap2.best_sector_3_time) == (27.5, 31.5, 31.0)
+    # HAM's lap-2 S1 is NaT: the lap-1 best must survive, and S2/S3 still update.
+    ham_lap2 = next(d for d in states[3].drivers if d.abbreviation == "HAM")
+    assert ham_lap2.sector_1_time is None
+    assert (ham_lap2.best_sector_1_time, ham_lap2.best_sector_2_time, ham_lap2.best_sector_3_time) == (28.5, 32.0, 31.5)
+
+
 def test_session_states_from_laps_maps_tire_and_position():
     laps, session_start = _laps_df()
     states = session_states_from_laps(laps, session_start)
@@ -119,6 +130,7 @@ def test_load_session_states_falls_back_to_synthesized_positions(monkeypatch):
         def __init__(self):
             self.laps = laps
             self.date = pd.Timestamp(session_start)
+            self.t0_date = pd.Timestamp(session_start)
             self.weather_data = pd.DataFrame(columns=["Time", "AirTemp", "TrackTemp", "Humidity", "WindSpeed", "Rainfall"])
             self.race_control_messages = pd.DataFrame(columns=["Time", "Category", "Message", "Flag"])
             self.pos_data = {}
@@ -142,6 +154,7 @@ def test_load_session_states_fills_partial_nan_positions_in_race(monkeypatch):
         def __init__(self):
             self.laps = laps
             self.date = pd.Timestamp(session_start)
+            self.t0_date = pd.Timestamp(session_start)
             self.weather_data = pd.DataFrame(columns=["Time", "AirTemp", "TrackTemp", "Humidity", "WindSpeed", "Rainfall"])
             self.race_control_messages = pd.DataFrame(columns=["Time", "Category", "Message", "Flag"])
             self.pos_data = {}
@@ -380,6 +393,13 @@ def test_session_states_from_laps_computes_gap_to_leader_and_ahead():
     assert ham_lap1.gap_to_leader == pytest.approx(1.0)  # HAM Time 1:33 - VER Time 1:32
     assert ham_lap1.gap_to_ahead == pytest.approx(1.0)   # only VER ahead
 
+    # state[2]: VER has posted lap 2, HAM is still on lap 1. HAM's gap is measured
+    # at HAM's lap (1:33 - VER's lap-1 1:32), never against VER's lap-2 crossing
+    # (which would come out at -89s).
+    ham_behind = next(d for d in states[2].drivers if d.abbreviation == "HAM")
+    assert ham_behind.gap_to_leader == pytest.approx(1.0)
+    assert ham_behind.gap_to_ahead == pytest.approx(1.0)
+
     # state[-1]: both drivers have posted lap 2 -> gaps reflect lap-2 times.
     ver_lap2 = next(d for d in states[-1].drivers if d.abbreviation == "VER")
     ham_lap2 = next(d for d in states[-1].drivers if d.abbreviation == "HAM")
@@ -566,6 +586,7 @@ def test_load_session_states_degrades_to_no_positions_when_pos_data_not_loaded(m
 
     class FakeSession:
         date = pd.Timestamp(session_start)
+        t0_date = pd.Timestamp(session_start)
         laps = fake_laps
         weather_data = pd.DataFrame(columns=["Time"])
         race_control_messages = pd.DataFrame(columns=["Time", "Category", "Message", "Flag"])

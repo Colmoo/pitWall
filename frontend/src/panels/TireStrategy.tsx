@@ -45,6 +45,10 @@ export function TireStrategy({
           <div key={driverNumber} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <span style={{ width: 40, flexShrink: 0 }}>{driver?.abbreviation}</span>
             <div style={{ display: "flex", flex: 1, gap: 1 }}>
+              {/* laps before the first recorded stint (lap 1 often has no time) keep their slot */}
+              {stints.length > 0 && stints[0].startLap > 1 && (
+                <div className="pitwall-tire-remaining" style={{ flex: `${stints[0].startLap - 1} 0 0` }} />
+              )}
               {stints.map((stint) => {
                 const laps = stint.endLap - stint.startLap + 1;
                 return (

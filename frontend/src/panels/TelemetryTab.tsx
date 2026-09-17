@@ -127,6 +127,7 @@ function OverlayTrace({
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
         style={{ width: "100%", height: 220, cursor: "crosshair", touchAction: "none" }}
         data-testid={testId}
         onPointerDown={handlePointerDown}
@@ -160,12 +161,20 @@ export function TelemetryTab({
   sessionParams,
   state,
   history,
+  selectedDriver = null,
 }: {
   sessionParams: TelemetrySessionParams;
   state: SessionState | null;
   history: SessionState[];
+  selectedDriver?: string | null;
 }) {
-  const [selections, setSelections] = useState<ComparisonSelection[]>([]);
+  // Start with the dashboard's selected driver on their current lap, so the tab
+  // opens showing traces instead of empty axes.
+  const [selections, setSelections] = useState<ComparisonSelection[]>(() => {
+    const driver = state?.drivers.find((d) => d.driver_number === selectedDriver);
+    if (!driver) return [];
+    return [{ id: `${driver.driver_number}-seed`, driver: driver.driver_number, abbreviation: driver.abbreviation, lapNumber: driver.lap_number ?? 1, color: comparisonColor(0) }];
+  });
   const [tracesById, setTracesById] = useState<Record<string, Traces | null>>({});
   const [zoomDomain, setZoomDomain] = useState<ZoomDomain>(FULL_DOMAIN);
 
@@ -214,6 +223,7 @@ export function TelemetryTab({
         </ul>
       </Panel>
       <Panel key="active-selections" id="active-selections" title="Comparing">
+        {selections.length === 0 && <p>Pick a driver on the left to compare laps.</p>}
         {selections.map((s) => (
           <div key={s.id} className="pitwall-comparison-row">
             <span className="pitwall-team-stripe" style={{ background: s.color }} />
